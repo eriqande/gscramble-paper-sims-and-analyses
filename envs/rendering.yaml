@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pandoc ==2.18
+  - graphviz ==2.40.1

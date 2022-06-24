@@ -1,0 +1,360 @@
+---
+title: "Simulating Admixture Fractions of Hybrid Categories, Without and With Physical Linkage"
+author: "Eric C. Anderson"
+date: "Last Updated: `r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+bibliography: references.bib
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+start_time <- Sys.time()
+```
+
+
+# Packages and paths
+
+```{r}
+library(tidyverse)
+library(gscramble)
+library(parallel)
+library(sessioninfo)
+```
+
+
+# Simulation assuming no physical linkage
+
+We are just going to go super simple here.  For each
+category, we have three probabilities for the expected
+genotype frequencies, and we will just do a simple trinomial
+draw for each locus.
+
+So, first we need the expected genotype frequencies.  These are vectors
+of the expected fraction of loci with aa, ab/ba, and bb alleles where
+A and B denote the species of origin.  I don't bother with F1 here because
+it is not very interesting.  It is always exactly 0.5 regardless of linkage.
+
+
+```{r}
+egfs <- list(
+  F2 = c(0.25, 0.5, 0.25),
+  BX1_a = c(0.5, 0.5, 0),  # F1 x a
+  BX1_b = c(0, 0.5, 0.5),  # F1 x b
+  BX2_a = c(0.75, 0.25, 0), # BX1_a x a
+  BX2_b = c(0, 0.25, 0.75), # BX1_b x b
+  BX3_a = c(0.875, 0.125, 0),
+  BX3_b = c(0, 0.125, 0.875),
+  BX4_a = c(0.9375, 0.0625, 0),
+  BX4_b = c(0, 0.0625, 0.9375)
+)
+
+# you know, we might as well make this a tibble
+tib1 <- tibble(
+  categ = names(egfs),
+  gfreqs = egfs
+)
+```
+
+
+Now, we need a function to simulate admixture fractions
+assuming no linkage.  
+
+```{r}
+#' @param geno_freqs expected frequency of the three genotype categories
+#' @param L number of loci used
+#' @param R number of replicates to simulate
+no_link_admix <- function(geno_freqs, L, R) {
+  # this gives a matrix with three rows
+  mat <- rmultinom(R, L, geno_freqs)
+  
+  # now add up the number of a alleles and divide by the
+  # total number of gene copies
+  colSums(mat * c(2, 1, 0)) / (2 * L)
+}
+```
+
+And now we can simulate 48,000 reps for numbers of loci in each of
+ 100, 1000, 10000, and 100000.
+```{r}
+REPS <- 48000
+tib2 <- expand(tib1, nesting(categ, gfreqs), L = 10^(2:5)) %>%
+  mutate(
+    admix_fracts = map2(
+      .x = gfreqs,
+      .y = L,
+      .f = function(x, y) no_link_admix(x, y, REPS)
+    )
+  ) %>%
+  unnest(admix_fracts)
+```
+
+Letus  quickly plot these to see what it is looking like:
+```{r}
+tib2 %>%
+  mutate(L_f = factor(L, levels = 10^(5:2))) %>%
+ggplot(aes(x = admix_fracts, fill = categ)) +
+  geom_histogram(binwidth = 0.005, position = position_identity(), alpha = 0.5) +
+  facet_wrap(~L_f, ncol = 1, scales = "free_y") +
+  theme_bw()
+
+```
+
+Yep, that is what we expect.  Now, we proceed...
+
+
+# Simulating admixture fractions with linkage
+
+For this, we will simply use the 'gscramble' package with the recombination map for the entire
+genome from pigs, which we have in this repo:
+```{r}
+RR <- read_rds("input/RecRates_Big.rds")
+```
+
+We can make all the backcross categories with a simple pedigree that 
+cascades down:
+```{r}
+ped <- read_csv("input/ped_F1_and_bx_1-4.csv")
+```
+
+Let's make a picture of that.  First we make an SVG:
+```{r}
+paths <- gsp2dot(ped)
+if(!("svg" %in% names(paths))) {
+  stop("You don't seem to have dot on the system path.")
+}
+```
+
+Then we print it here:
+```{r, echo=FALSE, out.width='100%'}
+knitr::include_graphics(paths["svg"])
+```
+
+Note that it will take a fair bit of time to simulate 2000 reps of that
+pedigree.  Let's plan on doing 48,000 reps.  That is 8 cores, each
+doing 2000, 4 times.  So we can break it up to parallelize it.
+
+We just make a single input table with reps from 1 to 2000 and then
+we mclapply that 24 times (8 cores).
+```{r}
+InputTable <- {
+  reppop <- expand_grid(
+    rep = 1:2000,
+    nesting(pop = c("A", "B"), group = c("a", "b"))
+  )
+  
+  # and then we need an input tibble:
+  IP <- tibble(
+    gpp = list(ped),
+    reppop = list(reppop)
+  )
+  IP
+}
+
+# now simulate segments and compute Q-values
+set.seed(66)
+admix_link <- mclapply(
+  1:24, 
+  function(x) {
+    segregate(
+      request = InputTable,
+      RR = RR
+    ) %>%
+      computeQs_from_segments(., check_total_length = FALSE) %>%
+      mutate(rep = rep + 2000 * (x-1))
+  },
+  mc.cores=8
+) %>% 
+  bind_rows()
+```
+
+
+Now, we change the sample_ids in that output into the hybrid categories.
+Here is a vector of replacments:
+```{r}
+hyb_cats <- c(
+  `7` = "F1",
+  `8` = "BX1",
+  `9` = "BX2",
+  `10` = "BX3",
+  `11` = "BX4"
+)
+```
+
+And then we have a bit of housekeeping stuff. We want a name for the panel we
+will add tot the bottom of the plot with the results from the linkage sims:
+```{r}
+panel_name <- "Exact genomic admixture fraction, simulated with physical linkage and recombination"
+```
+
+Now, we get the simulation results into the format of tib2 a little bit.
+At this stage I also do the trick of exploiting the symmetry
+to let the b-backcrosses just be the mirror image of the a backcrosses, to save time
+on the simulating.
+```{r}
+admix2 <- admix_link %>%
+  filter(ped_sample_id != 7) %>% # get rid of F1s
+  mutate(categ = str_c(hyb_cats[as.character(ped_sample_id)], "_", group_origin)) %>%
+  rename(admix_fracts = admixture_fraction) %>%
+  mutate(
+    L = panel_name
+  ) %>%
+  filter(samp_index == 1) %>%  # toss the additional samples for the BX4s.  We want the same number for all.  
+  select(categ, L, admix_fracts)
+```
+
+
+Now put this together with tib2.  BTW formatC is ridiculously slow!!
+```{r}
+tib3 <- tib2 %>%
+  mutate(L = formatC(L, format = "f", big.mark = ",", digits = 0)) %>%
+  select(-gfreqs)
+
+categ_levs <- c(
+  "BX4_b",
+  "BX3_b",
+  "BX2_b",
+  "BX1_b",
+  "F2",
+  "BX1_a",
+  "BX2_a",
+  "BX3_a",
+  "BX4_a"
+)
+
+tib4 <- bind_rows(tib3, admix2) %>%
+  mutate(
+    categ_f = factor(
+      categ, 
+      levels = categ_levs
+    ),
+    L_f = factor(
+      L,
+      levels = c("100,000", "10,000", "1,000", "100", panel_name)
+    )
+  )
+```
+
+# We still have to add the F2's with linkage to the results
+
+We can get a pedgree that makes 4 F2's like this:
+```{r}
+F2_gsp <- create_GSP("a", "b", F, T, F, F)
+```
+
+That pedigree looks like this:
+```{r, echo=FALSE, out.width='60%'}
+paths <- gsp2dot(F2_gsp)
+if(!("svg" %in% names(paths))) {
+  stop("You don't seem to have dot on the system path.")
+}
+knitr::include_graphics(paths["svg"])
+```
+
+
+Since that arrangement creates 4 F2s.  So, we need to do 12,000 reps of that.
+We will do 8 cores of 1500 each.
+```{r}
+InputTable_F2 <- {
+  reppop <- expand_grid(
+    rep = 1:1500,
+    nesting(pop = c("A", "B"), group = c("a", "b"))
+  )
+  
+  # and then we need an input tibble:
+  IP <- tibble(
+    gpp = list(F2_gsp),
+    reppop = list(reppop)
+  )
+  IP
+}
+
+# and then we let it do its thing:
+set.seed(77)
+admix_link_F2 <- mclapply(
+  1:8, 
+  function(x) {
+    segregate(
+      request = InputTable_F2,
+      RR = RR
+    ) %>%
+      computeQs_from_segments(., check_total_length = FALSE) %>%
+      mutate(rep = rep + 1500 * (x-1))
+  },
+  mc.cores=8
+) %>% 
+  bind_rows()
+
+# now we can filter as needed:
+F2_tib <- admix_link_F2 %>%
+  rename(admix_fracts = admixture_fraction) %>%
+  mutate(
+    categ = "F2",
+    L = panel_name,
+    .before = admix_fracts
+  ) %>%
+  mutate(
+    categ_f = factor(categ, levels = categ_levs),
+    L_f = factor(panel_name, levels = c("100,000", "10,000", "1,000", "100", panel_name)),
+    .after = admix_fracts
+  ) %>%
+  filter(pop_origin == "a") %>%
+  select(categ:L_f)
+```
+
+# Final plot
+
+Now add the F2s to the previous ones:
+```{r}
+tib5 <- bind_rows(tib4, F2_tib)
+```
+
+
+Now set up the colors:
+```{r}
+# here is a colorbrewer set1 palette, but I change yellow to cyan
+col_vals <- c('#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#00FFFF','#a65628','#f781bf','#999999')
+names(col_vals) <- categ_levs
+```
+
+Finally plot it all together:
+```{r}
+g <- ggplot(tib5, aes(x = admix_fracts, fill = categ_f)) +
+  geom_histogram(binwidth = 0.005, position = position_identity(), alpha = 0.5) +
+  facet_wrap(~L_f, ncol = 1, scales = "free_y") +
+  scale_fill_manual(values = col_vals, name = "Hybrid\nCategory") +
+  theme_bw() +
+  xlab("Admixture Fraction") +
+  ylab("Counts")
+
+g 
+```
+
+
+And make a PDF version of that for the paper:
+```{r}
+ggsave(g, filename = snakemake@output$fig, width = 8, height = 5.5)
+```
+
+
+# Session Info
+
+```{r}
+sessioninfo::session_info()
+```
+
+# Running Time
+
+Running the code and rendering this notebook required approximately this much time
+on a Mac laptop of middling speed:
+```{r}
+Sys.time() - start_time
+```
+
+# Citations
+
+
