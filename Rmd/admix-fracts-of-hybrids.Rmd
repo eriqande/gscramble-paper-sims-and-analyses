@@ -7,13 +7,30 @@ output:
     df_print: paged
     toc: true
     toc_float: true
-bibliography: references.bib
+bibliography: "`r here::here('references.bib')`"
 ---
+
 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE)
+knitr::opts_knit$set(root.dir = here::here())
 start_time <- Sys.time()
+```
+
+```{r rmd_snakemake_hacks, include=FALSE}
+# here is a little code to make it easy to work interactively with this
+# Rmarkdown document to try to find problems.  WHen you run it in snakemake,
+# it save the snakemake S4 class object.  When there is no snakemake object,
+# it reads it from the file that was previously saved.
+rsdir <- ".rmd_snakemake"
+dir.create(rsdir, showWarnings = FALSE)
+rdsfile <- file.path(rsdir, "admix-fracts.rds")
+if(exists("snakemake")) {
+  saveRDS(snakemake, file = rdsfile)
+} else {
+  snakemake <- readRDS(file = rdsfile)
+}
 ```
 
 
@@ -93,7 +110,7 @@ tib2 <- expand(tib1, nesting(categ, gfreqs), L = 10^(2:5)) %>%
   unnest(admix_fracts)
 ```
 
-Letus  quickly plot these to see what it is looking like:
+Let us  quickly plot these to see what it is looking like:
 ```{r}
 tib2 %>%
   mutate(L_f = factor(L, levels = 10^(5:2))) %>%
@@ -141,9 +158,14 @@ doing 2000, 4 times.  So we can break it up to parallelize it.
 We just make a single input table with reps from 1 to 2000 and then
 we mclapply that 24 times (8 cores).
 ```{r}
+# NOTE: It takes a long time to run this, and there are often
+# issues with Snakemake and pandoc, etc.  So, here I set variables
+# to be able to do much shorter run, easily, while troubleshooting.
+#rep_top <- 2000
+rep_top <- 2
 InputTable <- {
   reppop <- expand_grid(
-    rep = 1:2000,
+    rep = 1:rep_top,
     nesting(pop = c("A", "B"), group = c("a", "b"))
   )
   
@@ -165,7 +187,7 @@ admix_link <- mclapply(
       RR = RR
     ) %>%
       computeQs_from_segments(., check_total_length = FALSE) %>%
-      mutate(rep = rep + 2000 * (x-1))
+      mutate(rep = rep + rep_top * (x-1))
   },
   mc.cores=8
 ) %>% 
@@ -259,9 +281,11 @@ knitr::include_graphics(paths["svg"])
 Since that arrangement creates 4 F2s.  So, we need to do 12,000 reps of that.
 We will do 8 cores of 1500 each.
 ```{r}
+#rep_topF2 <- 1500
+rep_topF2 <- 2
 InputTable_F2 <- {
   reppop <- expand_grid(
-    rep = 1:1500,
+    rep = 1:rep_topF2,
     nesting(pop = c("A", "B"), group = c("a", "b"))
   )
   
@@ -283,7 +307,7 @@ admix_link_F2 <- mclapply(
       RR = RR
     ) %>%
       computeQs_from_segments(., check_total_length = FALSE) %>%
-      mutate(rep = rep + 1500 * (x-1))
+      mutate(rep = rep + rep_topF2 * (x-1))
   },
   mc.cores=8
 ) %>% 

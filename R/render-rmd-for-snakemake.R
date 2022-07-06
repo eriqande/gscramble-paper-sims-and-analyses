@@ -11,6 +11,14 @@
 #   - the output html file is named html in the output object
 #   - that renv is being used for R package management
 
+# NOTE:
+#   - This script sets the working directory to be the top level of the
+#     directory, which is typically the RStudio directory if the thing is
+#     also an RStudio project.  To get good behavior when just knitting the
+#     file, you should set the individual Rmd directory to Project Directory
+#     using the drop-down on RStudio's Knit button
+#
+#
 
 # this loads the package library managed by renv
 source("renv/activate.R");

@@ -1,0 +1,187 @@
+---
+title: "Making a Figure to Illustrate the Genetic Data Permutation Methods"
+author: "Eric C. Anderson"
+date: "Last Updated: `r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+bibliography: "`r here::here('references.bib')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_knit$set(root.dir = here::here())
+start_time <- Sys.time()
+```
+
+```{r rmd_snakemake_hacks, include=FALSE}
+# here is a little code to make it easy to work interactively with this
+# Rmarkdown document to try to find problems.  WHen you run it in snakemake,
+# it save the snakemake S4 class object.  When there is no snakemake object,
+# it reads it from the file that was previously saved.
+rsdir <- ".rmd_snakemake"
+dir.create(rsdir, showWarnings = FALSE)
+rdsfile <- file.path(rsdir, "admix-fracts.rds")
+if(exists("snakemake")) {
+  saveRDS(snakemake, file = rdsfile)
+} else {
+  snakemake <- readRDS(file = rdsfile)
+}
+```
+
+This is some code to make figures of different ways that one can permute the
+genetic data on the founder individuals.
+
+This will also provide a quick check that the methods are doing what we
+think they should be.
+
+We will create a simple data set of 12 individuals in three populations 5 in the first,
+4 in the second, and 3 in the third.
+
+And we will have markers on three chromosomes.  4 on the first, 5 on the second, and 6 on the third.
+
+We will make that right now, naming alleles according to the haplotypes that
+they are on.
+```{r}
+library(tidyverse)
+library(gscramble)
+
+N <- 12
+L <- 15
+G <- matrix(paste0(1:N, rep(c("a", "b"), each = 12)), nrow = N, ncol = 2 * L)
+
+# make the meta data to go with these
+Im <- tibble(
+  group = rep(c("pop1", "pop2", "pop3"), times = c(5, 4, 3)),
+  indiv = str_c("ind_", 1:N)
+)
+
+Mm <- tibble(
+  chrom = rep(c("1", "2", "3"), times = c(4, 5, 6)),
+) %>%
+  group_by(chrom) %>%
+  mutate(
+    pos = 1500 * 1:n(),
+    variant_id = str_c("marker_", chrom, "_", pos)
+  )
+
+```
+
+## Preliminaries 
+
+One thing that will be useful is a function to turn a matrix with an even
+number of columns into a tibble of alleles in individuals.
+```{r}
+
+# turn a matrix with N rows and 2L columns into a tibble
+# that names the individual gene copies
+gmat2tib <- function(M) {
+  if(ncol(M) %% 2 != 0) stop("Must be an even number of columns")
+  L <- ncol(M) / 2
+  N <- nrow(M)
+  
+  tibble(
+    ind = rep(1:N, times = 2 * L),
+    loc = rep(1:L, each = 2 * N),
+    hap = rep(rep(c("a", "b"), each = N), times = L),
+    ind_hap = factor(str_c(ind, hap), levels = str_c(rep(1:N, each = 2), c("a", "b"))),
+    alle = as.vector(M)
+  )
+  
+}
+
+tib <- gmat2tib(G)
+
+chrom_counts <- c(4, 5, 6)
+chrom_edges <- c(0, cumsum(chrom_counts))
+
+# now we can plot that.  Let's make a function to do that:
+plot_gmat_tib <- function(tib) {
+  tib %>% 
+    ggplot(aes(x = ind_hap, y = loc)) +
+    geom_raster(aes(fill = factor(as.integer(ind)))) +
+    geom_tile(fill = NA, color = "black", size = 0.05) +
+    geom_text(aes(label = hap)) +
+    geom_vline(xintercept = 0.5 + seq(0, 2*N, by = 2)) +
+    geom_hline(yintercept = 0.5 + chrom_edges) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) 
+}
+
+plot_gmat_tib(tib)
+```
+
+But, now, let's permute it using the methods in the `gscramble` package:
+```{r}
+# this function rearranges the matrix so that
+# haplotypes are in columns and markers are in rows
+Gr <- rearrange_genos(G, Im, Mm)
+
+# so, we will want to convert that format to a tibble also.
+# this function lets us convert ind and hap back to what they were
+# originally, after setting ind_hap.  This way we can get the colors
+# of the alleles and their original haplotypes that have been permuted into
+#the new positions.
+rearranged_gmat2tib <- function(M, old_hap_and_ind = FALSE) {
+  if(ncol(M) %% 2 != 0) stop("Must be an even number of columns")
+  N <- ncol(M) / 2
+  L <- nrow(M)
+  
+  ret <- tibble(
+    ind = rep(1:N, each = 2 * L),
+    loc = rep(1:L, times = 2 * N),
+    hap = rep(rep(c("a", "b"), each = L), times = N),
+    ind_hap = factor(str_c(ind, hap), levels = str_c(rep(1:N, each = 2), c("a", "b"))),
+    alle = as.vector(M)
+  )
+  
+  if(old_hap_and_ind == TRUE) {
+    ret <- ret %>%
+      select(-hap, -ind) %>%
+      extract(alle, into = c("ind", "hap"), regex = "^([0-9]+)([ab])$")
+  }
+
+  ret
+}
+
+# then we could read that in
+tibR <- rearranged_gmat2tib(Gr$G[[1]])
+
+# and plot it:
+plot_gmat_tib(tibR)
+
+```
+
+That all looks just how it should.  
+
+So, now, how about if we permute the markers?  We will do that here, and we will
+turn the matrix into a tibble, but after that, we will set ind to the value in
+the allele and hap into the a or b from the allele, so the cells are colored
+according to what they used to be and the a/b labels are from what they were
+before being permuted.
+```{r}
+set.seed(5)
+Gs_plain_permute <- perm_gs_by_pops(Gr)
+
+Gs_plain_permute$G_permed[[1]] %>%
+  rearranged_gmat2tib(old_hap_and_ind = TRUE) %>%
+  plot_gmat_tib()
+
+```
+
+
+And, then see what it looks like when we preserve haplotypes:
+```{r}
+set.seed(5)
+Gs_hap_permute <- perm_gs_by_pops(Gr, preserve_haplotypes = TRUE)
+
+Gs_hap_permute$G_permed[[1]] %>%
+  rearranged_gmat2tib(old_hap_and_ind = TRUE) %>%
+  plot_gmat_tib()
+
+```
+
+OK! That's a wrap!  This is all working as it should, and not I just
+have to deal with the colors and then make a good figure out of it.  
