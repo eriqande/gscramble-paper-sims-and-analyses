@@ -1,0 +1,100 @@
+---
+title: "Bias When Sampling With Replacement"
+output: html_document
+date: "2023-01-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Our goal here is to show that if you have sample from two putative
+populations that are not at all differentiated, you can run into real
+problems by simulating new individuals by sampling from replacement from
+them.  This is well known from, for example, Anderson, Waples, and
+Kalinowski (2008), but it has not been explored for admixture estimation, nor
+with a large number of SNPs.  I am going to do that here. 
+
+The plan:
+
+- We will have $L$ SNP loci.
+- The allele frequencies of the 1 allele in the population will
+  be drawn from a beta
+  distribution with parameters $a$ and $b$.
+- Start with two samples of $N$ individuals sampled from the same population.
+- From these samples, we will create $2n$ new individuals. $n$ of them will
+  have $q = Q_s$ and the other $n$ will have $Q = 1 - Q_s$.  The idea with
+  this is that we will still have the same allele frequencies overall amongst
+  all the individuals.  These will be simulated by the simple
+  unlinked structure model.
+- Put them all into plink format, then send them to admixture to
+  run them.  We will keep the original samples in as "known-pop-origin"
+  individuals, and assess how "well" we can estimate $q$ for each
+  simulated, admixed individual.
+
+
+I am tentatively thinking that we should do:
+
+- $L$ in 100, 1000, 10000, 100000 (4)
+- $a$ and $b$ in a "1/x" version, and another in a more ascertained version,
+  with more intermediate allele frequencies. I will have a MAF cutoff in 
+  there too (2)
+- $N$ in 25, 50, 100, 200 (4)
+- $n$ can be 12 (1)
+- $Q_s$ in 0, 0.125, 0.25, 0.5 (4)
+
+The number in parentheses are the number of possibilities.
+The total number of combinations is: 4 * 2 * 4 * 1 * 4 = 128
+
+And we will probably want to do 100 reps of each.  So that is
+12,800 runs of ADMIXTURE.  Should not be a problem on the cluster.
+
+REVAMP: We will do multiple Qs values in each simulation.  So we will'
+have n of each category.  So, we could take n down to 3.  
+
+
+It doesn't make sense to do this all within a notebook each
+time, so I will just do it via R scripts for simulating data,
+and then shell scripts for running ADMIXTURE.
+
+See the collection of functions in `R/bias-sim-funcs.R` and the
+main driver script that Snakemake launches in `R/bias-sim-script.R`.
+
+
+Note that after the things have been simulated we can run admixture like this:
+```sh
+plink2 --make-bed --pedmap plink --out plink; 
+admixture [--supervised] plink.bed  2; 
+paste key.tsv plink.2.Q
+```
+
+Pretty straightforward.  
+
+After playing around with this for a while it is clear that things are more
+biased if more individuals are simulated.  That makes sense.  
+
+We can do it with and without the --supervised option.  
+
+So, after experimenting with things a little bit, I think it would be worth it to
+do:
+
+- 4 numbers of loci: 100, 1000, 10000, 100000
+- 1 freq condition: a = 1, b = 8, t = 0.01
+- 4 values of N: 25, 50, 100, 250
+- 3 values of n: 1, 10, 50
+- 1 set of Qs: c(0, 0.125, 0.25, 0.375, 0.5)
+
+That will be 48 conditions.  
+
+The number of reps should be such that we end up with
+500 simulated individuals of each Q.  So, 500 reps for
+n = 1; 50 reps for n = 10, 10 reps for n = 50.
+
+Directory structure that would work for this would be:
+
+`results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink`...
+freq and Q will just be "A".  That way we could change them
+later if we wanted to.
+
+The ultimate files that we want would be: `supervised.Q` and `unsupervised.Q`
+that have the keys pasted to them.  

@@ -22,3 +22,14 @@ R version 4.2.0 (2022-04-22), and do these steps:
 3. Activate your snakemake environment in your Unix terminal
 4. Do `snakemake --use-conda --cores 8` to use 8 cores.  Set the number of cores
 as appropriate to your system.
+
+
+## Notes:
+
+The bias sims are pretty much ready to go for individual runs, I can do like:
+```sh
+snakemake --cores 4 --use-conda  results/bias_sims/freq_A/Qs_1/L_10000/N_100/n_10/Rep_1/supervised_Q.tsv
+```
+That will make "supervised_Q.tsv" and "unsupervised_Q.tsv" in the directory
+indicated.  I need to make a rule to aggregate the results from everything
+I want into one big tsv file that I can read into R.  
