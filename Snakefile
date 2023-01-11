@@ -1,17 +1,47 @@
 
-freqs=["A"]
-Qs=["1"]
-Ls=["100", "1000", "10000", "100000"]
-Ns=["25", "50", "100", "250"]
-ns=["1", "10", "50"]
+# Here are the different values for the simulations.
+
+freqs=["A"]  # in the R script, this translates to: list(a = 1, b = 8, t = 0.01)
+Qs=["1"]     # in the R script, this translates to: Qs <- c(0, 0.125, 0.25, 0.375, 0.5)
+Ls=["100", "1000", "10000", "100000"]  # number of loci
+Ns=["25", "50", "100", "250"]          # size of each reference population
+ns=["3", "12", "24"]                   # number of individuals simulated for each Q value
+
+
+# we want to devise these simulations so that for each
+# value of L, N, and n, and Q, we have a total of 480
+# simulated individuals.  That means, for:
+#  - n = 3: reps = 160
+#  - n = 12: reps = 40
+#  - n = 24: reps = 20
+
+# so, for testing, we could do 16, 4, and 2.  Or even smaller value.
+# I can set those value here:
+R3=2
+R12=2
+R24=2
+
+# Here, we make a list of all the different Q-output files that
+# we want to have as input to make one giant, gzipped text
+# file of the output for tidyverse processing:
+threes = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R3+1), cond=['super', 'unsuper'])
+twelves = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R12+1), cond=['super', 'unsuper'])
+twenty_fours = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R24+1), cond=['super', 'unsuper'])
+
+
 
 
 
 rule all:
 	input:
 		"results/figures/figure-001.pdf",
+		"results/compiled/Q-values-from-sims.tsv.gz",
 		"docs/001-introductory-linkage-sims.html",
 		"docs/003-permutation-methods-figure.html",
+
 
 
 
@@ -92,3 +122,16 @@ rule run_admixture:
 		" paste {params.key} {params.admix_out} > {output.uns}; "
 		" cd {params.ad_dir}; admixture  -s $(($RSEED + 2)) --supervised {params.bed_in}  2  > log_of_admixture_sup.txt 2>&1; cd $CUR_DIR; "
 		" paste {params.key} {params.admix_out} > {output.sup}; "
+
+
+rule compile_Qs:
+	input:
+		Qfiles=threes + twelves + twenty_fours
+	output:
+		"results/compiled/Q-values-from-sims.tsv.gz"
+	log:
+		"results/logs/compile_Qs.txt"
+	shell:
+		" (for i in {input.Qfiles}; do "
+		" awk -v file=$i 'BEGIN {{OFS=\"\t\"}} {{print file, $0}}'; "
+		" done | gzip -c > {output}) 2> {log} "

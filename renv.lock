@@ -470,8 +470,8 @@
       "RemoteRepo": "gscramble",
       "RemoteUsername": "eriqande",
       "RemoteRef": "HEAD",
-      "RemoteSha": "bc7aeeddea7e137f1fed6bba79aec4afd7504361",
-      "Hash": "b6cc487ceb45a2ea85a8cd2f386f599d",
+      "RemoteSha": "c199d6a5ca48d491988391e73126a34ca6641941",
+      "Hash": "b459a131d88f53fbf06565f1444e1bdd",
       "Requirements": [
         "dplyr",
         "ggplot2",
