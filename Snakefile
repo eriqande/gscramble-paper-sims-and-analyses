@@ -133,5 +133,5 @@ rule compile_Qs:
 		"results/logs/compile_Qs.txt"
 	shell:
 		" (for i in {input.Qfiles}; do "
-		" awk -v file=$i 'BEGIN {{OFS=\"\t\"}} {{print file, $0}}'; "
+		" awk -v file=$i 'BEGIN {{OFS=\"\t\"}} {{print file, $0}}' $i; "
 		" done | gzip -c > {output}) 2> {log} "
