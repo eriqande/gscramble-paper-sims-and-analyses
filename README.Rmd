@@ -26,10 +26,18 @@ as appropriate to your system.
 
 ## Notes:
 
-The bias sims are pretty much ready to go for individual runs, I can do like:
+To run this on Sedna, I did this:
 ```sh
-snakemake --cores 4 --use-conda  results/bias_sims/freq_A/Qs_1/L_10000/N_100/n_10/Rep_1/supervised_Q.tsv
+module load R/4.0.3
+R
+
+# and when it started it bootstrapped renv together and then
+# in R I did:
+renv::restore()
+
+# that took a while, because it built a lot of it from source
+# on Linux, but eventually got done.
+
+# then I gave a test run (2 reps for each condition) with:
+snakemake --cores 20 --use-conda --use-envmodules results/compiled/Q-values-from-sims.tsv.gz
 ```
-That will make "supervised_Q.tsv" and "unsupervised_Q.tsv" in the directory
-indicated.  I need to make a rule to aggregate the results from everything
-I want into one big tsv file that I can read into R.  
