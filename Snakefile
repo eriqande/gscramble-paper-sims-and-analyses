@@ -17,9 +17,9 @@ ns=["3", "12", "24"]                   # number of individuals simulated for eac
 
 # so, for testing, we could do 16, 4, and 2.  Or even smaller value.
 # I can set those value here:
-R3=160
-R12=40
-R24=20
+R3=16
+R12=4
+R24=2
 
 # Here, we make a list of all the different Q-output files that
 # we want to have as input to make one giant, gzipped text
@@ -33,6 +33,13 @@ twenty_fours = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}
 
 
 
+# this little function doubles the memory requested when
+# N=250, L=100000
+def mem_func(wildcards):
+	if(wildcards.N=="250" and wildcards.nloc=="100000"):
+		return 9600
+	else:
+		return 4800
 
 
 rule all:
@@ -89,7 +96,9 @@ rule simulate_bias_sim_data_sets:
 	log:
 		"results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/R-sim.log"
 	envmodules:
-		"R/4.0.3" 
+		"R/4.0.3"
+	resources:
+		mem_mb=mem_func 
 	output:
 		multiext("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink", ".ped", ".map", ".pop")
 	script:
