@@ -25,11 +25,11 @@ R24=20
 # we want to have as input to make one giant, gzipped text
 # file of the output for tidyverse processing:
 threes = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R3+1), cond=['super', 'unsuper'])
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=3, rep=range(1,R3+1), cond=['super', 'unsuper'])
 twelves = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R12+1), cond=['super', 'unsuper'])
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=12, rep=range(1,R12+1), cond=['super', 'unsuper'])
 twenty_fours = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=ns, rep=range(1,R24+1), cond=['super', 'unsuper'])
+	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=24, rep=range(1,R24+1), cond=['super', 'unsuper'])
 
 
 
