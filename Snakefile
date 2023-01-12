@@ -17,9 +17,9 @@ ns=["3", "12", "24"]                   # number of individuals simulated for eac
 
 # so, for testing, we could do 16, 4, and 2.  Or even smaller value.
 # I can set those value here:
-R3=2
-R12=2
-R24=2
+R3=160
+R12=40
+R24=20
 
 # Here, we make a list of all the different Q-output files that
 # we want to have as input to make one giant, gzipped text
