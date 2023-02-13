@@ -90,7 +90,7 @@ sim_admixed <- function(G, N, Qs, n) {
   Q3 <- rep(Q2, each = n)
   glist <- lapply(Q3, function(q) {
     # get the allele frequency of the first gene copy (depends on which
-    # population it came from)
+    # population it came from).  q is the fraction of reference population 1 in the indiv.
     f <- ifelse(runif(L) < q, f1, f2)
     # then sample the allelic types.  It is a 1 if an runif is less than the freq
     g1 <- as.integer(runif(L) < f)

@@ -53,3 +53,30 @@ sup_plot <- ggplot(supes, aes(x = simQ, y = q1, colour = factor(n))) +
 
 
 ggsave(sup_plot, filename = "results/figures/supervised_Qs.pdf", width = 10, height = 6)
+
+
+# Then we can do the unsupervised ones 
+unsupes <- full_dat %>%
+  filter(scond == "unsupervised") %>%
+  mutate(
+    group2 = str_replace(group, "reference_", "ref-")
+  ) %>%
+  mutate(
+    simQ = factor(group2, levels = c("ref-1", sort(unique(group2[!str_detect(group2, "ref")])), "ref-2"))
+  )
+
+
+sup_plot <- ggplot(unsupes, aes(x = simQ, y = q1, colour = factor(n))) +
+  #geom_abline(intercept = -1/8, slope = 1/8, linetype = "dotted") +
+  geom_boxplot(outlier.alpha = 0.5, outlier.size = 0.2) +
+  facet_grid(N ~ L) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+  ) +
+  scale_colour_manual(values = c(`3` = "#1b9e77", `12` = "#d95f02", `24` = "#7570b3")) +
+  guides(
+    colour = guide_legend(title = "n")
+  ) +
+  xlab("Simulated Q value") +
+  ylab("Estimated Q value")
+  

@@ -16,7 +16,7 @@ if(snakemake@params$freq == "A") {
 }
 
 
-if(snakemake@params$Q == "1") {
+if (snakemake@params$Q == "1" || snakemake@params$Q == "1_sim_the_knowns") {
   Qs <- c(0, 0.125, 0.25, 0.375, 0.5)
 } else {
   stop("Unknown Qs spec!")
@@ -43,6 +43,34 @@ G <- sim_inds(fp, N)
 
 # simulate the admixed individuals and add them in there
 A <- sim_admixed(G, N, Qs, n)
+
+# here we do some special things for the case when
+# snakemake@params$Q is "1_sim_the_knowns". Namely, we
+# replace the N reference individuals from each population
+# with N individuals simulated by drawing with replacement
+# from the original N.  This should produce even more profound
+# biases.
+if (snakemake@params$Q == "1_sim_the_knowns") {
+  # simulate the new ones
+  G2 <- sim_admixed(G = G, N = N, Qs = 0, n = N)
+  # pick out the new ones
+  G2_new <- G2[-(1:(2 * N)),]
+  # reorder these new ones so that pop1 indivs are first:
+  G2_n2 <- G2_new[c((N+1):(2*N), 1:N), ]
+  # then rename them to be s1 and s2
+  rownames(G2_n2)[1:N] <- "s1"
+  rownames(G2_n2)[(N + 1):(2 * N)] <- "s2"
+  
+  # then replace the top 2N individuals in A with the G2_n2 guys
+  A2 <- rbind(
+    G2_n2,
+    A[-(1:(2 * N)), ]
+  )
+  
+  # set that to A and move ahead
+  A <- A2
+}
+
 
 # write it out
 dir.create(dirname(prefix), showWarnings = FALSE, recursive = TRUE)

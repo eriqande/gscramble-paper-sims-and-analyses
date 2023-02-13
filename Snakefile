@@ -2,7 +2,7 @@
 # Here are the different values for the simulations.
 
 freqs=["A"]  # in the R script, this translates to: list(a = 1, b = 8, t = 0.01)
-Qs=["1"]     # in the R script, this translates to: Qs <- c(0, 0.125, 0.25, 0.375, 0.5)
+Qs=["1", "1_sim_the_knowns"]     # in the R script, these translate to: Qs <- c(0, 0.125, 0.25, 0.375, 0.5)
 Ls=["100", "1000", "10000", "100000"]  # number of loci
 Ns=["25", "50", "100", "250"]          # size of each reference population
 ns=["3", "12", "24"]                   # number of individuals simulated for each Q value
