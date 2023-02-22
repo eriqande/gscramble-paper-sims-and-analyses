@@ -41,3 +41,8 @@ renv::restore()
 # then I gave a test run (2 reps for each condition) with:
 snakemake --cores 20 --use-conda --use-envmodules results/compiled/Q-values-from-sims.tsv.gz
 ```
+
+To do the actual simulations on SEDNA I did this:
+```sj
+snakemake --profile hpcc-profiles/slurm/sedna results/compiled/Q-values-from-sims.tsv.gz
+```
