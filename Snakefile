@@ -24,12 +24,12 @@ R24=20
 # Here, we make a list of all the different Q-output files that
 # we want to have as input to make one giant, gzipped text
 # file of the output for tidyverse processing:
-threes = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=3, rep=range(1,R3+1), cond=['super', 'unsuper'])
-twelves = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=12, rep=range(1,R12+1), cond=['super', 'unsuper'])
-twenty_fours = expand("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=24, rep=range(1,R24+1), cond=['super', 'unsuper'])
+threes = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	bias_sims="bias_sims", freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=3, rep=range(1,R3+1), cond=['super', 'unsuper'])
+twelves = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	bias_sims="bias_sims", freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=12, rep=range(1,R12+1), cond=['super', 'unsuper'])
+twenty_fours = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	bias_sims="bias_sims", freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=24, rep=range(1,R24+1), cond=['super', 'unsuper'])
 
 
 
@@ -92,35 +92,38 @@ rule simulate_bias_sim_data_sets:
 		N="{N}",
 		n="{n}",
 		rep="{rep}",
-		prefix="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink"
+		prefix="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink",
+		sim_type="{bias_sims}"
 	log:
-		"results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/R-sim.log"
+		log="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/R-sim.log",
+		snake_obj="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/snake_obj.rds"
 	envmodules:
 		"R/4.0.3"
 	resources:
 		mem_mb=mem_func 
 	output:
-		multiext("results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink", ".ped", ".map", ".pop")
+		multiext("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink", ".ped", ".map", ".pop")
 	script:
 		"R/bias-sim-script.R"
 
 
 rule run_admixture:
 	input:
-		ped="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink.ped"
+		ped="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink.ped"
 	params:
-		plink_in="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink",
-		bed_out="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink",
-		seed_file="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/R.seed",
+		plink_in="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink",
+		bed_out="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink",
+		seed_file="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/R.seed",
 		bed_in="plink.bed",
-		admix_out="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink.2.Q",
-		key="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/key.tsv",
-		ad_dir="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}", # admixture writes to current working directory.  Lame!
+		admix_out="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/plink.2.Q",
+		key="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/key.tsv",
+		ad_dir="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}", # admixture writes to current working directory.  Lame!
+		sim_type="{bias_sims}"
 	output:
-		sup="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/supervised_Q.tsv",
-		uns="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/unsupervised_Q.tsv"
+		sup="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/supervised_Q.tsv",
+		uns="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/unsupervised_Q.tsv"
 	log:
-		plink="results/bias_sims/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/log_of_plink.txt",
+		plink="results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/log_of_plink.txt",
 	conda:
 		"envs/plink2_admixture.yaml"
 	shell:

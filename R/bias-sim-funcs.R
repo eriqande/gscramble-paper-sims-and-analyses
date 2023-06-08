@@ -111,6 +111,83 @@ sim_admixed <- function(G, N, Qs, n) {
 }
 
 
+
+#' Simulate admixed individuals from G by using gscramble
+#' 
+#' Once we are done with all the naive bias sims, we come back to some of the
+#' more severe cases and we simulate via permutation using gscramble.
+#'
+#' We can't specify Qs in the same way as we do for the naive simulation,
+#' and we will want to be somewhat economical about using up the reference samples
+#' while making admixed individuals.  To get the same Q values, we can make
+#' F1s and F2s for Q = 0.5,  Bx1 for Q = 0.25 or 0.75, and Bx2 for Q = 0.125 or Q = 0.875.
+#' These can all be made with the createGSP() function.  I will use a variety of
+#' them so as to get roughly the right number of different types.
+#'
+#' So, we are left needing to also make 0.375 and 0.625.  These are each Bx1's mated
+#' to an F1, so I will have to make a custom GSP for those.
+
+
+#' @param Ge the matrix of genotypes in two column format
+#' @param Im the simulated individuals meta data
+#' @param Mm the simulated marker meta data
+#' @param RR the recombination rates to use
+#' @param super  logical.  If TRUE, output supervised 
+sim_A_with_gscramble <- function(Ge, N, n, q, map = NULL) {
+  
+  # first order of business is to make the GSPs
+  # This first one gives us:
+  #- 2 Bx2-A's as s10  (0.125 B)
+  #- 1 BX1-A as s9     (0.25 B)
+  #- 2 F2s as s11      (0.5 B)
+  #- 1 F2 as s7        (0.5 B)
+  # And it only consumes 4 A's and 2 B's
+  gsp1 <- create_GSP(pop1 = "A", pop2 = "B", T, T, T, T)
+  
+  # This second one gives us:
+  #- 2 Bx2-B's as s10  (0.125 A)
+  #- 1 BX1-B as s9     (0.25 A)
+  #- 2 F2s as s11      (0.5 A)
+  #- 1 F2 as s7        (0.5 A)
+  # and it only consumes 2 A's and 4 B's
+  gsp1 <- create_GSP(pop1 = "B", pop2 = "A", T, T, T, T)
+  
+  # and finally we need to make our 0.375 and 0.625's, and a few
+  ped_odd_eighths <- read_csv("input/ped-with_3over8_and_5over8.csv")
+  
+  # now, we makea  reppop to sample from those pedigrees
+  rp_gsp1 <- tibble(
+    index = c(1L, 1L, 2L, 2L),
+    pop = c("A", "B", "A", "B"),
+    group = c("A", "B", "B", "A")
+  )
+  
+  rp_ped_odd <- tibble(
+    index = c(1L, 1L),
+    pop = c("A", "B"),
+    group = c("A", "B")
+  )
+  
+  Input_tibble <- tibble(
+    gpp = list(gsp1, ped_odd_eighths),
+    reppop = list(rp_gsp1, rp_ped_odd)
+  )
+  
+  # then segregate segments
+  Segments <- segregate(
+    request = Input_tibble,
+    RR = RR
+  )
+}
+
+
+
+
+
+
+
+
+
 # Cool! Now we just need a function to write the output of
 # sim_admixed() to PLINK format.  We will use gscramble2plink()
 # for that. 
