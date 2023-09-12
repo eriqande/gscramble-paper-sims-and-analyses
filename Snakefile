@@ -7,6 +7,9 @@ Ls=["100", "1000", "10000", "100000"]  # number of loci
 Ns=["25", "50", "100", "250"]          # size of each reference population
 ns=["3", "12", "24"]                   # number of individuals simulated for each Q value
 
+# Note, for the gscramble simulations, most of the hybrid categories
+# get two individuals simulated.  So, we will want 240 simulations
+# of those, and we will just set their n to 2.  
 
 # we want to devise these simulations so that for each
 # value of L, N, and n, and Q, we have a total of 480
@@ -31,6 +34,15 @@ twelves = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Re
 twenty_fours = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
 	bias_sims="bias_sims", freq=freqs, Q=Qs, nloc=Ls, N=Ns, n=24, rep=range(1,R24+1), cond=['super', 'unsuper'])
 
+# and here we request the gscramble sims
+gscrambles = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	bias_sims="gscramble", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,24+1), cond=['super', 'unsuper'])
+	
+# and these are the same thing, but with strongly diverged markers
+# so we can verify that our simulations and gscramble are working correctly
+gscramble_diffs = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
+	bias_sims="gscramble_diff", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,24+1), cond=['super', 'unsuper'])
+
 
 
 # this little function doubles the memory requested when
@@ -44,9 +56,9 @@ def mem_func(wildcards):
 
 rule all:
 	input:
-		"results/figures/figure-001.pdf",
+		#"results/figures/figure-001.pdf",
 		"results/compiled/Q-values-from-sims.tsv.gz",
-		"docs/001-introductory-linkage-sims.html",
+		#"docs/001-introductory-linkage-sims.html",
 		"docs/003-permutation-methods-figure.html",
 
 
@@ -138,7 +150,7 @@ rule run_admixture:
 
 rule compile_Qs:
 	input:
-		Qfiles=threes + twelves + twenty_fours
+		Qfiles=gscrambles + gscramble_diffs # + threes + twelves + twenty_fours
 	output:
 		"results/compiled/Q-values-from-sims.tsv.gz"
 	log:

@@ -132,8 +132,7 @@ sim_admixed <- function(G, N, Qs, n) {
 #' @param Im the simulated individuals meta data
 #' @param Mm the simulated marker meta data
 #' @param RR the recombination rates to use
-#' @param super  logical.  If TRUE, output supervised 
-sim_A_with_gscramble <- function(Ge, N, n, q, map = NULL) {
+sim_A_with_gscramble <- function(Ge, Im, Mm, RR) {
   
   # first order of business is to make the GSPs
   # This first one gives us:
@@ -150,16 +149,28 @@ sim_A_with_gscramble <- function(Ge, N, n, q, map = NULL) {
   #- 2 F2s as s11      (0.5 A)
   #- 1 F2 as s7        (0.5 A)
   # and it only consumes 2 A's and 4 B's
-  gsp1 <- create_GSP(pop1 = "B", pop2 = "A", T, T, T, T)
+  gsp2 <- create_GSP(pop1 = "B", pop2 = "A", T, T, T, T)
   
-  # and finally we need to make our 0.375 and 0.625's, and a few
+  # and finally we need to make our 0.375 and 0.625's, and a few BX1s.
+  # This third one gives us:
+  #- 1 BX1-A as s10           (0.75 A)
+  #- 2 BX1-B x F1 as s11      (0.375 A)
+  #- 1 BX1-B as s9            (0.25 A)
+  #- 2 BX1-A x F1 as s12      (0.625 A)
+  # and it consumes 3 A's and 3 B's.
   ped_odd_eighths <- read_csv("input/ped-with_3over8_and_5over8.csv")
   
-  # now, we makea  reppop to sample from those pedigrees
+  # now, we make a reppop to sample from those pedigrees
   rp_gsp1 <- tibble(
-    index = c(1L, 1L, 2L, 2L),
-    pop = c("A", "B", "A", "B"),
-    group = c("A", "B", "B", "A")
+    index = c(1L, 1L),
+    pop = c("A", "B"),
+    group = c("A", "B")
+  )
+  
+  rp_gsp2 <- tibble(
+    index = c(1L, 1L),
+    pop = c("A", "B"),
+    group = c("A", "B")
   )
   
   rp_ped_odd <- tibble(
@@ -169,8 +180,8 @@ sim_A_with_gscramble <- function(Ge, N, n, q, map = NULL) {
   )
   
   Input_tibble <- tibble(
-    gpp = list(gsp1, ped_odd_eighths),
-    reppop = list(rp_gsp1, rp_ped_odd)
+    gpp = list(gsp1, gsp2, ped_odd_eighths),
+    reppop = list(rp_gsp1, rp_gsp2, rp_ped_odd)
   )
   
   # then segregate segments
@@ -178,6 +189,75 @@ sim_A_with_gscramble <- function(Ge, N, n, q, map = NULL) {
     request = Input_tibble,
     RR = RR
   )
+  
+  # then do the markers
+  Markers <- segments2markers(
+    Segs = Segments,
+    Im = Im,
+    Mm = Mm,
+    G = Ge
+  )
+  
+  # and now we just have the somewhat laborious process of making the
+  # output here look like the output of sim_admixed(), in terms of the order
+  # of the rows in the matrix of genotypes, and also their rownames.
+  ids <- Markers$ret_ids %>%
+    extract(
+      indiv,
+      into = c("gpp", "sam", "idx"),
+      regex = "^h-([0-9]+)-1-([0-9]+)-([0-9]+)-[0-9]+",
+      convert = TRUE,
+      remove = FALSE
+    ) %>%
+    mutate(
+      row_id = case_when(
+        group == "ped_hybs" & gpp == 1 & sam %in% c(7, 11) ~ "0.5",
+        group == "ped_hybs" & gpp == 1 & sam == 9  ~ "0.75",
+        group == "ped_hybs" & gpp == 1 & sam == 10  ~ "0.875",
+        group == "ped_hybs" & gpp == 2 & sam %in% c(7, 11) ~ "0.5",
+        group == "ped_hybs" & gpp == 2 & sam == 9  ~ "0.25",
+        group == "ped_hybs" & gpp == 2 & sam == 10  ~ "0.125",
+        group == "ped_hybs" & gpp == 3 & sam == 10  ~ "0.75",
+        group == "ped_hybs" & gpp == 3 & sam == 12  ~ "0.625",
+        group == "ped_hybs" & gpp == 3 & sam == 11  ~ "0.375",
+        group == "ped_hybs" & gpp == 3 & sam == 9  ~ "0.25",
+        group == "A" ~ "s1",
+        group == "B" ~ "s2",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    mutate(
+      row2id = str_c(row_id, "--", 1:n())  # this will make some things unique
+    )
+  
+  matG <- Markers$ret_geno
+  rownames(matG) <- ids$row2id
+  
+  # pull out the admixed and non-adxixed ones to properly sort these things
+  non_ad <- matG[str_detect(rownames(matG), "^s"), ]
+  ad <- matG[!str_detect(rownames(matG), "^s"), ]
+  
+  newsort_ad <- sort(rownames(ad))
+  
+  ad2 <- ad[newsort_ad,]
+  
+  rownames(non_ad) <- str_replace(rownames(non_ad), "--[0-9]+$", "")
+  rownames(ad2) <- str_replace(rownames(ad2), "--[0-9]+$", "")
+  
+  # now, we also want to take two of the pure s2 and two of the pure s1
+  # permuted individuals and add them as 0.0 and 1.0 indivs.  
+  s1s <- non_ad[1:2, ]
+  rownames(s1s) <- c("1.0", "1.0")
+  s2s <- non_ad[(nrow(non_ad) - 1):nrow(non_ad), ]
+  rownames(s2s) <- c("0.0", "0.0")
+  
+  non_ad <- non_ad[-c(1:2, (nrow(non_ad) - 1):nrow(non_ad)), ]
+  
+  
+  # then, return the matrix with the pure ones and then the admixed ones
+  ret <- rbind(non_ad, s2s, ad2, s1s)
+  
+  ret
 }
 
 

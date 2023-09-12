@@ -4,7 +4,7 @@ sink(log, type = "message")
 saveRDS(snakemake, file = snakemake@log$snake_obj)
 
 
-source("renv/activate.R");
+#source("renv/activate.R");
 
 # This script makes a set of plink files to feed into admixture
 library(tidyverse)
@@ -13,8 +13,8 @@ source("R/bias-sim-funcs.R")
 #snakemake <- read_rds("results/bias_sims/freq_A/Qs_1/L_120/N_50/n_3/Rep_113/snake_obj.rds")
 
 sim_type <- snakemake@params$sim_type
-if (!(sim_type %in% c("bias_sims", "gscramble_unlinked", "gscramble_linked"))) {
-  stop("The bias_sims wildcard must be either bias_sims or gscramble. ")
+if (!(sim_type %in% c("bias_sims", "gscramble", "gscramble_diff"))) {
+  stop("The bias_sims wildcard must be either bias_sims or gscramble.")
 }
 
 # Example Parameter values.  Will ultimately get these from snakemake.
@@ -50,6 +50,29 @@ set.seed(Rseed)
 # simulate the reference individuals
 G <- sim_inds(fp, N)
 
+# now, this is super hacky.  If sim_type is gscramble_diff
+# then I want to simulate two populations that are actually 
+# quite different, to make sure that things are actually being
+# simulated correctly.  To do that, I will simulate two different
+# samples with different allele freqs and then take the top N from one and the bottom from the
+# other
+if(sim_type == "gscramble_diff") {
+  G1 <- sim_inds(fp, N)
+  
+  fp2 <- fp
+  fp2$a <- fp$b
+  fp2$b <- fp$a
+  G2 <- sim_inds(fp2, N)
+  
+  Gdiff <- rbind(
+    G1[1:N, ],
+    G2[(N+1):nrow(G2), ]
+  )
+  
+  G <- Gdiff
+  
+}
+
 
 if (sim_type == "bias_sims") {
   # simulate the admixed individuals and add them in there
@@ -82,7 +105,7 @@ if (sim_type == "bias_sims") {
     A <- A2
   }
 } else {
-  # here we are doing it via gscramble
+  # here we are doing it via gscramble or gscramble-fixies
   
   # Make a two-column per locus format.  Let the alleles be A for 0 and T for 1
   first_gc <- G
@@ -103,6 +126,7 @@ if (sim_type == "bias_sims") {
     indiv = paste0(c(rep("A", nrow(G) / 2), rep("B", nrow(G) / 2)), "_", c(1:(nrow(G) / 2), 1:(nrow(G) / 2)))
   )
   
+  rownames(Ge) <- Im$indiv
   
   # Now, let us also make some marker meta data.  We will assume a pig-sized genome from
   # RecRates, and we will put just randomly broadcast the markers in order onto those
@@ -132,6 +156,7 @@ if (sim_type == "bias_sims") {
   
   # Now, we have everything that we would need to run gscramble: Ge, Im, Mm, and RR.
   # So, we will do that in a function.
+  A <- sim_A_with_gscramble(Ge = Ge, Im = Im, Mm = Mm, RR = RR)
   
 }
 
