@@ -36,12 +36,12 @@ twenty_fours = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{
 
 # and here we request the gscramble sims
 gscrambles = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	bias_sims="gscramble", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,24+1), cond=['super', 'unsuper'])
+	bias_sims="gscramble", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,240+1), cond=['super', 'unsuper'])
 	
 # and these are the same thing, but with strongly diverged markers
 # so we can verify that our simulations and gscramble are working correctly
 gscramble_diffs = expand("results/{bias_sims}/freq_{freq}/Qs_{Q}/L_{nloc}/N_{N}/n_{n}/Rep_{rep}/{cond}vised_Q.tsv",
-	bias_sims="gscramble_diff", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,24+1), cond=['super', 'unsuper'])
+	bias_sims="gscramble_diff", freq=freqs, Q=1, nloc=[1000], N=50, n=2, rep=range(1,240+1), cond=['super', 'unsuper'])
 
 
 
@@ -150,7 +150,7 @@ rule run_admixture:
 
 rule compile_Qs:
 	input:
-		Qfiles=gscrambles + gscramble_diffs # + threes + twelves + twenty_fours
+		Qfiles=gscrambles + gscramble_diffs + threes + twelves + twenty_fours
 	output:
 		"results/compiled/Q-values-from-sims.tsv.gz"
 	log:
