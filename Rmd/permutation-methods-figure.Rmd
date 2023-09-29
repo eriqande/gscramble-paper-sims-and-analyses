@@ -86,7 +86,7 @@ gmat2tib <- function(M) {
     ind = rep(1:N, times = 2 * L),
     loc = rep(1:L, each = 2 * N),
     hap = rep(rep(c("a", "b"), each = N), times = L),
-    ind_hap = factor(str_c(ind, hap), levels = str_c(rep(1:N, each = 2), c("a", "b"))),
+    ind_hap = factor(str_c(ind, hap), levels = paste0(rep(1:N, each = 2), c("a", "b"))),
     alle = as.vector(M)
   )
   
@@ -102,12 +102,14 @@ plot_gmat_tib <- function(tib) {
   tib %>% 
     ggplot(aes(x = ind_hap, y = loc)) +
     geom_raster(aes(fill = factor(as.integer(ind)))) +
-    geom_tile(fill = NA, color = "black", size = 0.05) +
+    geom_tile(fill = NA, color = "black", linewidth = 0.05) +
     geom_text(aes(label = hap)) +
     geom_vline(xintercept = 0.5 + seq(0, 2*N, by = 2)) +
+    geom_vline(xintercept = 0.5 + 2 * cumsum(c(5, 4, 3)), linewidth = 1) +
     geom_hline(yintercept = 0.5 + chrom_edges) +
     scale_x_discrete(expand = c(0, 0)) +
-    scale_y_discrete(expand = c(0, 0)) 
+    scale_y_discrete(expand = c(0, 0)) +
+    scale_fill_brewer(type = "qual", palette = "Paired")
 }
 
 plot_gmat_tib(tib)
@@ -133,7 +135,7 @@ rearranged_gmat2tib <- function(M, old_hap_and_ind = FALSE) {
     ind = rep(1:N, each = 2 * L),
     loc = rep(1:L, times = 2 * N),
     hap = rep(rep(c("a", "b"), each = L), times = N),
-    ind_hap = factor(str_c(ind, hap), levels = str_c(rep(1:N, each = 2), c("a", "b"))),
+    ind_hap = factor(str_c(ind, hap), levels = paste0(rep(1:N, each = 2), c("a", "b"))),
     alle = as.vector(M)
   )
   
@@ -182,6 +184,41 @@ Gs_hap_permute$G_permed[[1]] %>%
   plot_gmat_tib()
 
 ```
+
+Now, we might also want to simply permute individuals around.  In this case
+we will first permute the gene copies at each locus within each individual,
+and then permute the entire individuals.
+
+```{r}
+set.seed(15)
+Gs_hap_permute3 <- perm_gs_by_pops(Gr, preserve_individuals = TRUE)
+
+Gs_hap_permute3$G_permed[[1]] %>%
+  rearranged_gmat2tib(old_hap_and_ind = TRUE) %>%
+  plot_gmat_tib()
+
+```
+
+Compare that to the original:
+```{r}
+plot_gmat_tib(tib)
+```
+
+And, if you didn't want to permute the gene copies within each individual you
+would give both the `preserve_individuals = TRUE` _and_ `preserve_haplotypes = TRUE`
+options:
+```{r}
+set.seed(15)
+Gs_hap_permute4 <- perm_gs_by_pops(Gr, preserve_individuals = TRUE, preserve_haplotypes = TRUE)
+
+Gs_hap_permute4$G_permed[[1]] %>%
+  rearranged_gmat2tib(old_hap_and_ind = TRUE) %>%
+  plot_gmat_tib()
+
+```
+
+But, keep in mind that you would only do that if you had phased data.
+
 
 OK! That's a wrap!  This is all working as it should, and not I just
 have to deal with the colors and then make a good figure out of it.  
