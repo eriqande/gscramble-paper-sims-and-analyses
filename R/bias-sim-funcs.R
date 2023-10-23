@@ -139,7 +139,7 @@ sim_A_with_gscramble <- function(Ge, Im, Mm, RR) {
   #- 2 Bx2-A's as s10  (0.125 B)
   #- 1 BX1-A as s9     (0.25 B)
   #- 2 F2s as s11      (0.5 B)
-  #- 1 F2 as s7        (0.5 B)
+  #- 1 F1 as s7        (0.5 B)
   # And it only consumes 4 A's and 2 B's
   gsp1 <- create_GSP(pop1 = "A", pop2 = "B", T, T, T, T)
   
@@ -147,7 +147,7 @@ sim_A_with_gscramble <- function(Ge, Im, Mm, RR) {
   #- 2 Bx2-B's as s10  (0.125 A)
   #- 1 BX1-B as s9     (0.25 A)
   #- 2 F2s as s11      (0.5 A)
-  #- 1 F2 as s7        (0.5 A)
+  #- 1 F1 as s7        (0.5 A)
   # and it only consumes 2 A's and 4 B's
   gsp2 <- create_GSP(pop1 = "B", pop2 = "A", T, T, T, T)
   

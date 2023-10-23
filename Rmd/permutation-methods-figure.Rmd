@@ -105,11 +105,16 @@ plot_gmat_tib <- function(tib) {
     geom_tile(fill = NA, color = "black", linewidth = 0.05) +
     geom_text(aes(label = hap)) +
     geom_vline(xintercept = 0.5 + seq(0, 2*N, by = 2)) +
-    geom_vline(xintercept = 0.5 + 2 * cumsum(c(5, 4, 3)), linewidth = 1) +
-    geom_hline(yintercept = 0.5 + chrom_edges) +
+    geom_vline(xintercept = 0.5 + 2 * cumsum(c(5, 4, 3)), linewidth = 1.5) +
+    geom_hline(yintercept = 0.5 + chrom_edges, linewidth = 1.5) +
+    geom_hline(yintercept = c(-0.5, max(tib$loc) + 0.5), linewidth = 1.5) +
+    geom_vline(xintercept = c(-0.5, 0.5 + n_distinct(tib$ind_hap)), linewidth = 1.5) +
     scale_x_discrete(expand = c(0, 0)) +
     scale_y_discrete(expand = c(0, 0)) +
-    scale_fill_brewer(type = "qual", palette = "Paired")
+    scale_fill_brewer(type = "qual", palette = "Paired") +
+    theme(legend.position = "none") +
+    xlab("Haplotypes in 12 diploids in 3 populations") + 
+    ylab("Loci on three chromosomes")
 }
 
 plot_gmat_tib(tib)

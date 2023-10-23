@@ -8,7 +8,7 @@ date: "2023-01-10"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Our goal here is to show that if you have sample from two putative
+Our goal here is to show that if you have sampled from two putative
 populations that are not at all differentiated, you can run into real
 problems by simulating new individuals by sampling from replacement from
 them.  This is well known from, for example, Anderson, Waples, and

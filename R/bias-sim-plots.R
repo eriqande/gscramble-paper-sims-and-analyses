@@ -2,6 +2,7 @@
 
 
 library(tidyverse)
+library(cowplot)
 
 file <- "results/compiled/Q-values-from-sims.tsv.gz"
 
@@ -211,3 +212,9 @@ ggsave(gs_diff_sup_plot, filename = "results/figures/gscram_diff_supervised_Qs.p
 ggsave(gs_diff_unsup_plot, filename = "results/figures/gscram_diff_unsupervised_Qs.pdf", width = 5, height = 3)
 
 
+
+### Down here we will make figures for the papers using cowplot
+
+cpg <- cowplot::plot_grid(unsup_plot, sup_plot, labels = c("a)", "b)"), ncol = 1)
+
+ggsave(cpg, filename = "results/figures/bias-sims-unsup-and-sup.pdf", width = 10, height = 13)
