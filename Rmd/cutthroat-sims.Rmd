@@ -271,7 +271,8 @@ cutt_geno_wide <- cutt_geno_long %>%
 
 # this we will use in gscramble
 cutt_I_meta <- cutt_geno_wide %>%
-  select(group, indiv)
+  select(group, indiv) %>%
+  mutate(indiv = as.character(indiv))
 
 # rename the marker meta to something more familiar (like the data
 # from the gscramble package)
@@ -325,7 +326,7 @@ we end up with a sample that looks a little like what was inferred, in terms of
 numbers of a fish of different categories.  
 
 In fact, looking at Table 1 in @rizza2023limited, in order to simulate data that
-look like what we observed would have:
+look like what we observed, we would have something like:
 
 - 15 F1
 - 1 F2
@@ -333,7 +334,165 @@ look like what we observed would have:
 - 6 BxC
 - 6 BxC2
 
-So, we will shoot for something that is approximately like that
+So, we will shoot for something that is approximately like that. And let's add some
+BxC3's in there too, for good measure.  We also want to have enough individuals that
+we get a good sample of each of the categories. So, something approximately like:
+
+- 15 F1
+- 4 F2
+- 3 BxC x BxC2
+- 8 BxC
+- 8 BxC2
+- 5 BxC3
+
+We need to put together some pedigrees that will get us this.  We do that by
+modifying some of the ones made by `create_gsp()`.  
+
+So, 1 pedigree with 8 BxC2's and 1 pedigree with 4 BxCs can be joined up. Mating
+2 BxC2's with 2 BxC's to get 4 BxC3,
+leaving us with 6 BxC2's and 2 BxCs.
+
+
+Let's make that pediguree.
+```{r}
+BxC2_8 <- create_GSP(pop1 = "c", pop2 = "s", F1B2 = TRUE)
+BxC_4 <- create_GSP(pop1 = "c", pop2 = "s", F1B = TRUE) %>%
+  renumber_GSP(add = 15)
+
+# now, we have 23 the offspring of 12 and 21, so i is a BxC x BxC2's.
+# then we also mate 15 to 26---the offspring of 2 new cutt founders, 24 and 25---to 
+# get 8 BxC3's with id 27.
+add_em <- tibble(
+  ind = c(23, 24, 25, 26, 27),
+  par1 = c(12, NA, NA, 24, 15),
+  par2 = c(21, NA, NA, 25, 26),
+  ipar1 = c(4, NA, NA, 2, 4),
+  ipar2 = c(4, NA, NA, 2, 4),
+  sample = c("s23", NA, NA, NA, "s27"),
+  osample = c(4L, NA, NA, NA, 4L),
+  hpop1 = c(NA, "c", "c", NA, NA),
+  hpop2 = c(NA, "c", "c", NA, NA),
+  hap1 = c(NA, "24a", "25a", NA, NA),
+  hap2 = c(NA, "24b", "25b", NA, NA)
+)
+
+newGSP <- bind_rows(BxC2_8, BxC_4) %>% 
+  mutate(
+    sample = case_when(
+      ind %in% c(12, 15, 21) ~ NA,
+      TRUE ~ sample
+      ),
+    osample = case_when(
+      ind %in% c(12, 15, 21) ~ NA,
+      TRUE ~ osample
+      ),
+  ) %>%
+  bind_rows(add_em)
+
+# let's quickly plot that to make sure it is looking correct
+dotpaths <- gsp2dot(newGSP)
+
+knitr::include_graphics(dotpaths["svg"])
+```
+
+What we get out of that are:
+```{r}
+newGSP_key <- tibble(
+  name = "newGSP",
+  samples = c("s13", "s14", "s27", "s22", "s23"),
+  n = c(2, 2, 4, 2, 4),
+  type = c("BxC2", "BxC2", "BxC3", "BxC", "BxCxBxC2")
+)
+
+newGSP_key
+```
+
+Great.  That covers most of the difficult cases.  What we need now are
+about 16 F1s and a few F2's and some BxC's.  We can just do however
+many replicates of each `create_GSP()` that gives us those.  
+
+```{r}
+# 4 backcrosses
+BxC_4 <- create_GSP("c", "s", F1B = TRUE)
+
+# 2 F1's
+F1_2 <- create_GSP("c", "s", F1 = TRUE)
+
+# 4 F2's
+F2_4 <- create_GSP("c", "s", F2 = TRUE)
+```
+
+And we just need to make reppop's for each of those.
+
+```{r}
+# this is for the GSPs we do just a single rep of (F2, newGSP, BxC_4)
+single_rep <- tibble(
+  index = c(1L, 1L),  # note, index has be an integer.  Hence the "L" on each number
+  pop = c("c", "s"),
+  group = c("CCT", "SH")
+)
+
+# we will get 16 F1's by repping the F1_2 8 times
+eight_rep <- tibble(index = rep(1:8, each = 2)) %>%
+  mutate(
+    pop = rep(c("c", "s"), length.out = n()),
+    group = rep(c("CCT", "SH"), length.out = n())
+  )
+```
+
+With these we can make our input tibble:
+```{r}
+InputTibble <- tibble(
+  gpp = list(newGSP, BxC_4, F2_4, F1_2),
+  reppop = list(single_rep, single_rep, single_rep, eight_rep)
+)
+```
+
+# Looking at some simulated segments
+
+Let's simulate some segments through these genomes and have a look:
+```{r}
+set.seed(122) # for reproducibility
+Segments <- segregate(
+  request = InputTibble,
+  RR = cutt_RecRates
+)
+```
+
+Note that this has created 38 simulated hybrid individuals:
+```{r}
+Segments %>% 
+  count(gpp, index, ped_sample_id, samp_index)
+```
+
+Let's see if we can plot those:
+```{r}
+g <- plot_simulated_chromomsome_segments(Segments, cutt_RecRates)
+
+#ggsave(g, filename = "/tmp/segs.pdf", width = 30, height = 30)
+```
+That only looks good as a high-res PDF.  But it shows that this is doing what
+we think it should be doing.
+
+
+# A quick trial of simulating some genotypes
+
+```{r}
+Segments2 <- segregate(
+  request = InputTibble,
+  RR = cutt_RecRates,
+  MM = cutt_M_meta
+)
+
+Markers <- segments2markers(
+  Segs = Segments2,
+  Im = cutt_I_meta,
+  Mm = cutt_M_meta,
+  G = cutt_Geno
+)
+```
+
+We are close to ready to do a big set of simulations with these. 
 
 ## Literature Cited
 
