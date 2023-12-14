@@ -62,10 +62,11 @@ NHREPS=range(1, 500+1)   # give it 500 reps
 rule all:
 	input:
 		#"results/figures/figure-001.pdf",
-		"results/compiled/Q-values-from-sims.tsv.gz",
+		#"results/compiled/Q-values-from-sims.tsv.gz",
 		#"docs/001-introductory-linkage-sims.html",
-		"docs/003-permutation-methods-figure.html",
-		"docs/004-prep-for-cutthroat-sims.html"
+		#"docs/003-permutation-methods-figure.html",
+		#"docs/004-prep-for-cutthroat-sims.html",
+		"results/compiled/newhybs_sims_pofz.tsv"
 
 
 
@@ -181,6 +182,8 @@ rule prep_for_cutthroat_sims:
 	log:
 		"results/logs/prep_for_cutthroat_sims/log.txt"
 	threads: 1
+	envmodules:
+		"R/4.0.3"
 	conda:
 		"envs/rendering.yaml"
 	script:
@@ -201,6 +204,8 @@ rule sim_and_run_cutt_newhybs:
 	log:
 		"results/logs/sim_and_run_cutt_newhybs/markers_{nhmark}-rep_{nhrep}.log"
 	threads: 1
+	envmodules:
+		"R/4.0.3"
 	script:
 		"R/newhybs-cutt-sims.R"
 
