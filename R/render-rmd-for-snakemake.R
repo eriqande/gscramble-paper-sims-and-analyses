@@ -1,6 +1,6 @@
 
 
-# this is a simple R script let's let me sanely
+# this is a simple R script lets let me sanely
 # render an Rmd with Snakemake, and put the html output where I
 # want to, and also to have other output files that are specified
 # in the snakefile rule block.  Also, chunks get evaluated in the
@@ -21,7 +21,7 @@
 #
 
 # this loads the package library managed by renv
-source("renv/activate.R");
+#source("renv/activate.R");
 
 # redirect output and messages/errors to the log
 log <- file(snakemake@log[[1]], open="wt")

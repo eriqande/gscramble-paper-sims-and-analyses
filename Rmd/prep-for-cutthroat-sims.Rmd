@@ -1,5 +1,5 @@
 ---
-title: "Simulating cutthroat-rainbow trout hybrids and passing them to NewHybrids"
+title: "Preparation for simulating cutthroat-rainbow trout hybrids and passing them to NewHybrids"
 author: "Eric C. Anderson"
 date: "Last Updated: `r Sys.Date()`"
 output:
@@ -16,22 +16,6 @@ knitr::opts_knit$set(root.dir = here::here())
 start_time <- Sys.time()
 ```
 
-```{r rmd_snakemake_hacks, include=FALSE}
-# here is a little code to make it easy to work interactively with this
-# Rmarkdown document to try to find problems.  WHen you run it in snakemake,
-# it save the snakemake S4 class object.  When there is no snakemake object,
-# it reads it from the file that was previously saved.
-rsdir <- ".rmd_snakemake"
-dir.create(rsdir, showWarnings = FALSE)
-rdsfile <- file.path(rsdir, "admix-fracts.rds")
-if(exists("snakemake")) {
-  saveRDS(snakemake, file = rdsfile)
-} else {
-  snakemake <- readRDS(file = rdsfile)
-}
-```
-
-
 
 Load the libraries.
 ```{r, warning=FALSE, message=FALSE}
@@ -39,6 +23,21 @@ library(tidyverse)
 library(cowplot)
 library(gscramble)
 library(readxl)
+
+if(!exists("snakemake")) {
+  input_list = list(
+    rtmap = "data/cutts/rainbow_trout_genetic_map_AG_TL.xlsx",
+    affymeta = "data/cutts/men12337-sup-0002-appendixs2.xlsx",
+    cutt_markers_meta = "data/cutts/cutt-markers-mapped.csv",
+    cutt_genos = "data/cutts/Loci_96_Indiv_876.csv"
+  )
+  output_list <- list(
+    rda = "results/cutthroat-sim-prep/objects.rda"
+  )
+} else {
+  input_list = snakemake@input
+  output_list = snakemake@output
+}
 
 ```
 
@@ -90,8 +89,8 @@ this is a good start.
 
 ```{r}
 # read in the data files we have
-map <- read_excel("data/cutts/rainbow_trout_genetic_map_AG_TL.xlsx")
-affy_meta <- read_excel("data/cutts/men12337-sup-0002-appendixs2.xlsx")
+map <- read_excel(input_list$rtmap)
+affy_meta <- read_excel(input_list$affymeta)
 
 # get the flanking region for each Affy SNP ID and replace the [X/Y] with X
 # and also count the position from the beginning of the sequence that [X/Y] construct
@@ -221,7 +220,7 @@ Read in the markers and genotypes:
 # just put each variant in the center of where it mapped. We don't
 # need to be right on it for this, and 20 or 30 bp here and there
 # will make no difference.
-cutts_marker_meta <- read_csv("data/cutts/cutt-markers-mapped.csv") %>%
+cutts_marker_meta <- read_csv(input_list$cutt_markers_meta) %>%
   rename(
     chrom = chromosome,
     variant_id = marker_name
@@ -233,7 +232,7 @@ cutts_marker_meta <- read_csv("data/cutts/cutt-markers-mapped.csv") %>%
   
 # the genotypes are basically coded by species.  So let's clean it up a bit and filter
 # it down to the 65 loci in cutts_marker_meta
-cutt_geno_long <- read_csv("data/cutts/Loci_96_Indiv_876.csv") %>%
+cutt_geno_long <- read_csv(input_list$cutt_genos) %>%
   pivot_longer(cols = -c(no, ID, `Hybrid Class`), names_to = "locus", values_to = "geno") %>%
   semi_join(cutts_marker_meta, by = join_by(locus == variant_id)) %>%
   mutate(
@@ -411,6 +410,9 @@ Great.  That covers most of the difficult cases.  What we need now are
 about 16 F1s and a few F2's and some BxC's.  We can just do however
 many replicates of each `create_GSP()` that gives us those.  
 
+Also, to see how often pure Cutts are misclassified as some type of backcross,
+we probably should through 8 Pure Cutts in there, too.
+
 ```{r}
 # 4 backcrosses
 BxC_4 <- create_GSP("c", "s", F1B = TRUE)
@@ -420,6 +422,9 @@ F1_2 <- create_GSP("c", "s", F1 = TRUE)
 
 # 4 F2's
 F2_4 <- create_GSP("c", "s", F2 = TRUE)
+
+# 2 PureCutts
+PC_2 <- create_GSP("c", "s", F1 = TRUE)
 ```
 
 And we just need to make reppop's for each of those.
@@ -438,13 +443,19 @@ eight_rep <- tibble(index = rep(1:8, each = 2)) %>%
     pop = rep(c("c", "s"), length.out = n()),
     group = rep(c("CCT", "SH"), length.out = n())
   )
+four_rep_all_cutt <- tibble(
+  index = rep(1:4, each = 2)) %>%
+  mutate(
+    pop = rep(c("c", "s"), length.out = n()),
+    group = rep(c("CCT", "CCT"), length.out = n())
+  )
 ```
 
 With these we can make our input tibble:
 ```{r}
 InputTibble <- tibble(
-  gpp = list(newGSP, BxC_4, F2_4, F1_2),
-  reppop = list(single_rep, single_rep, single_rep, eight_rep)
+  gpp = list(newGSP, BxC_4, F2_4, F1_2, PC_2),
+  reppop = list(single_rep, single_rep, single_rep, eight_rep, four_rep_all_cutt)
 )
 ```
 
@@ -459,7 +470,7 @@ Segments <- segregate(
 )
 ```
 
-Note that this has created 38 simulated hybrid individuals:
+Note that this has created 38 simulated hybrid individuals, plus the 8 pure cutts
 ```{r}
 Segments %>% 
   count(gpp, index, ped_sample_id, samp_index)
@@ -467,7 +478,7 @@ Segments %>%
 
 Let's see if we can plot those:
 ```{r}
-g <- plot_simulated_chromomsome_segments(Segments, cutt_RecRates)
+g <- plot_simulated_chromomsome_segments(Segments, cutt_RecRates, fill_by_group_origin = TRUE)
 
 #ggsave(g, filename = "/tmp/segs.pdf", width = 30, height = 30)
 ```
@@ -492,7 +503,131 @@ Markers <- segments2markers(
 )
 ```
 
-We are close to ready to do a big set of simulations with these. 
+We are close to ready to do a big set of simulations with these. But before we do that, I would
+like to rename the individuals in a way that makes sense.  So, I will make a tibble
+of the sample numbers in each of the different GSPs in the request above and then
+we can join that on there. We can start with the newGSP_key that we made above:
+```{r}
+hyb_key <- newGSP_key %>%
+  mutate(
+    sample = as.integer(str_sub(samples, 2, 3)),
+    gpp = 1
+  ) %>%
+  select(gpp, sample, type) %>%
+  bind_rows(
+    list(
+      tibble(
+        gpp = c(2, 2),
+        sample = c(6, 7),
+        type = "BxC"
+      ),
+      tibble(
+        gpp = 3,
+        sample = 7,
+        type = "F2"
+      ),
+      tibble(
+        gpp = 4,
+        sample = 3, 
+        type = "F1"
+      ),
+      tibble(
+        gpp = 5,
+        sample = 3, 
+        type = "PureCutt"
+      )
+    )
+  )
+hyb_key
+```
+Now, here is a function to use that key to name individuals according to their
+type, and add a new column called id to the Markers$ret_ids output.
+```{r}
+#' @param M the Markers output
+#' @param K the hybrid key
+rename_indivs <- function(M, K) {
+  new_names <- M$ret_ids %>%
+    extract(
+      indiv, 
+      into = c("gpp", "sample"), 
+      regex = "h-([0-9])-[0-9]-([0-9]+)-", 
+      convert = TRUE,
+      remove = FALSE
+    ) %>%
+    left_join(K, by = join_by(gpp, sample)) %>%
+    mutate(
+      type = case_when(
+        group == "ped_hybs" ~ type,
+        TRUE ~ group
+      )
+    ) %>%
+    group_by(type) %>%
+    mutate(
+      id = sprintf("%s_%03d", type, 1:n())
+    ) %>%
+    ungroup()
+  
+  M$ret_ids <- new_names
+  
+  M
+}
+```
+
+Here we use it:
+```{r}
+Markers2 <- rename_indivs(Markers, hyb_key)
+```
+
+# Make a newhybrids file of that
+
+There is a function in gscramble to do this:
+```{r}
+gs2nh_ret <- gscramble2newhybrids(Markers2, cutt_M_meta, z = c("CCT", "SH"), s = "CCT|SH", outfile = "/tmp/newhybs-full.txt")
+```
+
+And, if we want to try it with just the 30 markers used in the @rizza2023limited paper,
+we can pass those locus names in to the `retain` argument. 
+```{r}
+markers30 <- scan("data/cutts/30-markers-used-in-newhybs.txt", what = "character")
+gs2nh30_ret <- gscramble2newhybrids(
+  Markers2, 
+  cutt_M_meta, 
+  z = c("CCT", "SH"), 
+  s = "CCT|SH", 
+  outfile = "/tmp/newhybs-30-loci.txt",
+  retain = markers30
+  )
+```
+
+Both of the files made there work just fine in newhybrids.  So, I think we are ready to run a
+big simulation.  We just need to save some output files that we will use
+in that big simulation.
+
+```{r}
+dir.create(dirname(output_list$rda), recursive = TRUE, showWarnings = FALSE)
+
+# we make an rda with the objects we will need for new simulations, which will be done
+# in an R-script
+save(
+  InputTibble, cutt_RecRates, cutt_M_meta, cutt_I_meta, cutt_Geno, hyb_key, rename_indivs, markers30,
+  file = output_list$rda,
+  compress = "xz" 
+)
+```
+
+
+
+It is worth counting up the number of fish of each hybrid category that this produces:
+```{r}
+Markers2$ret_ids %>%
+  count(type) %>%
+  filter(!(type %in% c("CCT", "SH")))
+```
+
+So, we note that each simulation gives us at least 4 individuals of the smallest
+group.  So, if we do 500 simulations, that will give us the distribution of values
+for at least 2000 individuals.  That should provide a good summary.
+
 
 ## Literature Cited
 

@@ -1,5 +1,5 @@
 
-# Here are the different values for the simulations.
+######## Here are the different values for the bias simulations.  ################
 
 freqs=["A"]  # in the R script, this translates to: list(a = 1, b = 8, t = 0.01)
 Qs=["1", "1_sim_the_knowns"]     # in the R script, these translate to: Qs <- c(0, 0.125, 0.25, 0.375, 0.5)
@@ -54,12 +54,18 @@ def mem_func(wildcards):
 		return 4800
 
 
+######### Here are values for the newhybrids simulations ################
+NHMARKERS=[30,65]
+NHREPS=range(1, 500+1)   # give it 500 reps
+
+
 rule all:
 	input:
 		#"results/figures/figure-001.pdf",
 		"results/compiled/Q-values-from-sims.tsv.gz",
 		#"docs/001-introductory-linkage-sims.html",
 		"docs/003-permutation-methods-figure.html",
+		"docs/004-prep-for-cutthroat-sims.html"
 
 
 
@@ -159,3 +165,55 @@ rule compile_Qs:
 		" (for i in {input.Qfiles}; do "
 		" awk -v file=$i 'BEGIN {{OFS=\"\t\"}} {{print file, $0}}' $i; "
 		" done | gzip -c > {output}) 2> {log} "
+
+
+
+rule prep_for_cutthroat_sims:
+	input:
+		Rmd = "Rmd/prep-for-cutthroat-sims.Rmd",
+		rtmap = "data/cutts/rainbow_trout_genetic_map_AG_TL.xlsx",
+		affymeta = "data/cutts/men12337-sup-0002-appendixs2.xlsx",
+		cutt_markers_meta = "data/cutts/cutt-markers-mapped.csv",
+		cutt_genos = "data/cutts/Loci_96_Indiv_876.csv"
+	output:
+		html = "docs/004-prep-for-cutthroat-sims.html",
+		rda = "results/cutthroat-sim-prep/objects.rda"
+	log:
+		"results/logs/prep_for_cutthroat_sims/log.txt"
+	threads: 1
+	conda:
+		"envs/rendering.yaml"
+	script:
+		"R/render-rmd-for-snakemake.R"
+
+
+
+
+rule sim_and_run_cutt_newhybs:
+	input:
+		rda = "results/cutthroat-sim-prep/objects.rda",
+		nhcats = "input/newhybs_categories.txt"
+	output:
+		nhdat = "results/newhyb_sims/markers_{nhmark}-rep_{nhrep}/nh_dat.txt",
+		nhout = "results/newhyb_sims/markers_{nhmark}-rep_{nhrep}/aa-PofZ.txt",
+	params:
+		nmark = "{nhmark}"
+	log:
+		"results/logs/sim_and_run_cutt_newhybs/markers_{nhmark}-rep_{nhrep}.log"
+	threads: 1
+	script:
+		"R/newhybs-cutt-sims.R"
+
+
+
+rule compile_NH_runs:
+	input:
+		expand("results/newhyb_sims/markers_{nhmark}-rep_{nhrep}/aa-PofZ.txt", nhmark=NHMARKERS, nhrep=NHREPS)
+	output:
+		"results/compiled/newhybs_sims_pofz.tsv"
+	log:
+		"results/logs/compile_NH_runs/log.txt"
+	shell:
+		" for i in {input}; do awk -v f=\"$i\" 'BEGIN {{OFS=\"\t\"}} NR>1 {{print f, $0}}' $i;  done > {output} 2> {log} " 
+
+
