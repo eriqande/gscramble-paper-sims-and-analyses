@@ -210,7 +210,21 @@ plink_map_tib <- phys_map_filt %>%
 mapfile <- "intermediates/affy-plink-morgans-map.gz"
 write_tsv(plink_map_tib, col_names = FALSE, file = mapfile)
 
-cutt_RecRates <- plink_map2rec_rates(mapfile, use_morgans = TRUE)
+cutt_RecRates0 <- plink_map2rec_rates(mapfile, use_morgans = TRUE)
+```
+
+Now, there needs to be a little extra cleanup here.  We need to remove any bins
+that somehow ended up with an end_point that is not 1 or more greater than the start
+point.  Note there are about 16 cases of that here:
+```{r}
+cutt_RecRates0 %>%
+  filter(end_pos - start_pos < 1)
+```
+
+So, we chuck them out now:
+```{r}
+cutt_RecRates <- cutt_RecRates0 %>%
+  filter(end_pos - start_pos >= 1)
 ```
 
 # Making the markers object
