@@ -1,0 +1,256 @@
+---
+title: "Preparation for simulating cutthroat-rainbow trout hybrids and passing them to NewHybrids"
+author: "Eric C. Anderson"
+date: "Last Updated: `r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+bibliography: "`r here::here('references.bib')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_knit$set(root.dir = here::here())
+start_time <- Sys.time()
+```
+
+
+Load the libraries.
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(cowplot)
+
+
+if(!exists("snakemake")) {
+  input_list = list(
+    summ = "results/compiled/newhybs_sims_pofz.tsv.gz",
+    cat = "input/newhybs_categories.txt"
+  )
+  output_list <- list(
+    barplots = "results/summarizing-newhybrids-simulations/newhybs-barplots.pdf",
+    barplots_eps = "image-forge/newhybs-barplots.eps"
+  )
+} else {
+  input_list = snakemake@input
+  output_list = snakemake@output
+}
+# you can create the necessary output directories like this:
+dump <- lapply(output_list, function(x)
+  dir.create(dirname(x), recursive = TRUE, showWarnings = FALSE)
+)
+
+```
+
+
+Let's read in the data and parse the file names, etc.
+```{r}
+cats <- read_tsv(input_list$cat, col_names = FALSE, skip = 1)
+cat_vec <- cats$X1
+
+summ <- read_tsv(input_list$summ, col_names = FALSE)
+names(summ) <- c("file", "idx", "id", cat_vec)
+
+
+# now we pivot it into a long format and parse the file names.  We drop the ones
+# that had ids starting with SH or CCT, because those were the learning samples
+# in the analysis.  Also, we want to give each individual within nmark values
+# a globally unique ID for sorting them...
+prepped_summ <- summ %>%
+  pivot_longer(-(file:id), names_to = "Z", values_to = "PofZ") %>%
+  extract(file, into = c("nmark", "rep"), regex = "results/newhyb_sims/markers_([0-9]+)-rep_([0-9]+)/aa-PofZ.txt", convert = TRUE) %>%
+  mutate(true_cat = str_replace(id, "_[0-9]+$", ""), .after = id) %>%
+  filter(!(true_cat %in% c("SH", "CCT"))) %>%
+  mutate(glob_id = str_c(id, "-", rep))
+
+```
+
+We will probably want to order the true categories in one way or another, so let us do that here in
+order of difficulty of inference, sort of,
+```{r}
+cat_ord <- c(
+  "PureCutt",
+  "F1",
+  "F2",
+  "BxC",
+  "BxC2",
+  "BxCxBxC2",
+  "BxC3"
+)
+
+```
+
+Now, I want to plot these in pairs---i.e. for each true category I want a 30 markers and a 65 markers
+facet together.  And I want to order the individuals in a particular way for each of these pairs:
+we are going to group individuals according to the MAP category they are assigned to, and we will
+order those groups according to how many individuals are in each, but within each group we will arrange
+in descending order on the MAP PofZ.  Cool.
+```{r}
+# first, get the MAP Z and the MAP PofZ for each fish
+map_info <- prepped_summ %>%
+  group_by(nmark, rep, id) %>%
+  filter(PofZ == max(PofZ)) %>%
+  slice(1) %>% # this line in case any were 50/50 (super unlikely!)
+  ungroup() %>%
+  rename(
+    mapZ = Z,
+    mapPofZ = PofZ
+  )
+
+# now we get the number of individuals in each of those groups and assign them
+# a group order.  We do this with the 30 and 65 marker cases combined.
+cat_ranks <- map_info %>%
+  count(true_cat, mapZ, name = "grp_cnt") %>%
+  arrange(true_cat, desc(grp_cnt)) %>%
+  group_by(true_cat) %>%
+  mutate(grp_rank = 1:n()) %>%
+  ungroup()
+
+# now we can join all that back to the prepped_summ and do some arranging and then
+# assigning x-values.  
+arranged_for_plotting <- prepped_summ %>%
+  left_join(
+    map_info %>% select(nmark, glob_id, mapZ, mapPofZ), 
+    by = join_by(nmark, glob_id)
+  ) %>%
+  left_join(
+    cat_ranks,
+    by = join_by(true_cat, mapZ)
+  ) %>%
+  arrange(nmark, true_cat, grp_rank, desc(mapPofZ)) %>%
+  group_by(nmark, true_cat) %>%
+  mutate(xpos = as.integer(factor(glob_id, levels = unique(glob_id)))) %>%
+  ungroup()
+  
+```
+
+There is one final thing that we will want to deal with: the colors should be stacked
+on the plot so that within each MAP group, the MAP Z color is on the bottom, and then
+the other colours will all come in above them.  And when those colors come in above them
+we can just leave those in a particular order.  So, let's define some colors and we will
+use the names of those to make different factors that describe the order of the colors.
+
+```{r}
+
+# here are some colors:
+mycolors <- c(
+  CCT = "#a6cee3", 
+  BxC2 = "#6a3d9a",
+  BxCxBxC2 = "#fb9a99",
+  BxC = "#1f78b4",
+  F1 = "#fdbf6f", 
+  F2 = "#e31a1c",
+  BxSHxBxSH2 = "gray80",
+  BxSH2 = "gray80",
+  BxSH = "gray80", 
+  SH = "gray80"
+)
+
+Z_ord_basic <- names(mycolors)
+```
+
+Now, it turns out that, in these barplots, I want the MAP-Z color to be strictly on the bottom
+each time, so that it is easier to see what the total PofZ for that MAP-Z is.  However,
+that cannot be implemented with geom_col() because color ordering is done by the
+factor levels, and it doesn't seem that you can set those levels for different
+groups within the same tibble, and then have them stick correctly when plotting with
+ggplot and geom_col().  So, I am just going to "roll my own" bars using geom_rect.
+
+Now, for each individual, we are merely going to order the Z's by the names of mycolors,
+after first putting the mapZ one first. And then we will get the endpoints of the rectangles
+(stacked as they will be) with a cumsum.
+```{r}
+further_arranged <- arranged_for_plotting %>%
+  mutate(
+    Z_f = factor(Z, levels = names(mycolors)),
+    NotMapZ = as.integer(!(Z == mapZ))
+  ) %>%
+  arrange(nmark, true_cat, grp_rank, desc(mapPofZ), NotMapZ, Z_f) %>%
+  group_by(nmark, glob_id) %>%
+  mutate(ytop = cumsum(PofZ)) %>%
+  mutate(ybot = lag(ytop, default = 0), .before = ytop)
+  
+  
+```
+
+
+
+Now, we will cycle over the the true categories and make the plots.  
+
+```{r}
+plots <- list()
+for(TC in cat_ord) {
+  tmp <- further_arranged %>%
+    filter(true_cat == TC)
+  the_plot <- tmp %>%
+    ggplot() +
+    geom_rect(
+      data = tmp,
+      mapping = aes(xmin = xpos, xmax = xpos + 1, ymin = ybot, ymax = ytop, fill = Z_f),
+      colour = NA,
+      linewidth = 0
+    ) +
+    facet_grid(nmark ~ .) +
+    scale_fill_manual(values = mycolors) +
+    xlab("Individual Index") +
+    ylab("Posterior Prob.") +
+    theme_bw() +
+    theme(
+      legend.position = "none", 
+      axis.text.y = element_blank(),
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -1.2),
+      plot.margin = unit(c(0,0,0,0), "pt"),
+      panel.spacing = unit(0.5, "mm")
+    ) +
+    scale_x_continuous(expand = c(0,0)) +
+    scale_y_continuous(expand = c(0,0)) +
+    ggtitle(TC) 
+
+  plots[[TC]] <- the_plot
+    
+}
+names(plots) <- TCs
+
+# Before we cowplot those together, I am going to have to roll my own legend.  I will
+# only include the ones that appear in there.
+legie <- tribble( 
+  ~cat, ~x, ~y,
+  "lCCT",  8, 28,
+  "lBxC2", 58, 28, 
+  "lF1", 8, 18,
+  "lF2", 58, 18,
+  "lBxCxBxC2", 8, 8
+)
+lcol <- mycolors
+names(lcol) <- str_c("l", names(mycolors))
+
+legend_bit <- ggplot(legie) +
+  geom_rect(aes(xmin = x - 8, xmax = x, ymin = y - 8, ymax = y, fill = cat), colour = "black") +
+  geom_text(aes(x = x + 2, y = y - 4, label = cat), hjust = 0, vjust = 0.5) +
+  annotate("text", x = 0, y = 32, label = "Inferred Hybrid Category", hjust = 0, vjust = 0.5) +
+  annotate("text", x = 45, y = 40, label = "Individual Index", hjust = 0.5, vjust = 0) +
+  scale_fill_manual(values = lcol) +
+  theme_void() +
+  coord_fixed(ratio = 1) +
+  guides(fill = guide_legend(position = "none")) +
+  theme(legend.position = "none") +
+  xlim(-2, 90) +
+  ylim(0, 42)
+  
+
+
+# Now, we cowplot it:
+
+plots$LEGEND <- legend_bit
+pg <- plot_grid(plotlist = plots, ncol = 1)
+
+ggsave(pg, filename = output_list$barplots, width = 4, height = 10)
+ggsave(pg, filename = output_list$barplots_eps, width = 4, height = 10)
+
+system(
+  "cd image-forge; latex newyhybs-fig-forge.tex; dvips -E -o newhybs-texed.ps newyhybs-fig-forge.dvi; ps2pdf newhybs-texed.ps; pdfcrop newhybs-texed.pdf"
+)
+```

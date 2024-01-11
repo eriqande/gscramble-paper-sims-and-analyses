@@ -314,7 +314,7 @@ cutt_RecRates
 ```
 
 Let's make sure that all the markers are within the map. With this and some other
-sleuthing, we see that one marker is just outside of the map.  So, will will adjust
+sleuthing, we see that one marker is just outside of the map.  So, we will adjust
 the map.
 ```{r}
 cutt_RecRates %>%
