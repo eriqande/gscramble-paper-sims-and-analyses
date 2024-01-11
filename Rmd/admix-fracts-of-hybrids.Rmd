@@ -11,33 +11,44 @@ bibliography: "`r here::here('references.bib')`"
 ---
 
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_knit$set(root.dir = here::here())
 start_time <- Sys.time()
 ```
 
-```{r rmd_snakemake_hacks, include=FALSE}
-# here is a little code to make it easy to work interactively with this
-# Rmarkdown document to try to find problems.  WHen you run it in snakemake,
-# it save the snakemake S4 class object.  When there is no snakemake object,
-# it reads it from the file that was previously saved.
-rsdir <- ".rmd_snakemake"
-dir.create(rsdir, showWarnings = FALSE)
-rdsfile <- file.path(rsdir, "admix-fracts.rds")
-if(exists("snakemake")) {
-  saveRDS(snakemake, file = rdsfile)
+
+Load the libraries.
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+
+
+if(!exists("snakemake")) {
+  input_list = list(
+    Rmd = "Rmd/admix-fracts-of-hybrids.Rmd",
+    cat = "input/newhybs_categories.txt"
+  )
+  output_list <- list(
+    html = "docs/001-introductory-linkage-sims.html",
+		fig = "results/figures/linkage-sims-fig.pdf",
+		fig_eps = "results/figures/linkage-sims-fig.eps",
+		simdat = "results/admix-fracts-of-hybrids/simulated-data.rds"
+  )
 } else {
-  snakemake <- readRDS(file = rdsfile)
+  input_list = snakemake@input
+  output_list = snakemake@output
 }
+# you can create the necessary output directories like this:
+dump <- lapply(output_list, function(x)
+  dir.create(dirname(x), recursive = TRUE, showWarnings = FALSE)
+)
+
 ```
 
 
 # Packages and paths
 
 ```{r}
-library(tidyverse)
 library(gscramble)
 library(parallel)
 library(sessioninfo)
@@ -165,7 +176,7 @@ rep_top <- 2000
 #rep_top <- 2   # this is for testing, so it doesn't take so long....
 InputTable <- {
   reppop <- expand_grid(
-    rep = 1:rep_top,
+    index = 1:rep_top,
     nesting(pop = c("A", "B"), group = c("a", "b"))
   )
   
@@ -187,7 +198,7 @@ admix_link <- mclapply(
       RR = RR
     ) %>%
       computeQs_from_segments(., check_total_length = FALSE) %>%
-      mutate(rep = rep + rep_top * (x-1))
+      mutate(rep = index + rep_top * (x-1))
   },
   mc.cores=8
 ) %>% 
@@ -285,7 +296,7 @@ rep_topF2 <- 1500
 #rep_topF2 <- 2  # for short testing runs
 InputTable_F2 <- {
   reppop <- expand_grid(
-    rep = 1:rep_topF2,
+    index = 1:rep_topF2,
     nesting(pop = c("A", "B"), group = c("a", "b"))
   )
   
@@ -307,7 +318,7 @@ admix_link_F2 <- mclapply(
       RR = RR
     ) %>%
       computeQs_from_segments(., check_total_length = FALSE) %>%
-      mutate(rep = rep + rep_topF2 * (x-1))
+      mutate(rep = index + rep_topF2 * (x-1))
   },
   mc.cores=8
 ) %>% 
@@ -335,6 +346,8 @@ F2_tib <- admix_link_F2 %>%
 Now add the F2s to the previous ones:
 ```{r}
 tib5 <- bind_rows(tib4, F2_tib)
+
+write_rds(tib5, file = output_list$simdat, compress = "xz")
 ```
 
 
@@ -361,7 +374,8 @@ g
 
 And make a PDF version of that for the paper:
 ```{r}
-ggsave(g, filename = snakemake@output$fig, width = 8, height = 5.5)
+ggsave(g, filename = output_list$fig, width = 6.5, height = 5.5)
+ggsave(g, filename = output_list$fig_eps, width = 6.5, height = 5.5)
 ```
 
 

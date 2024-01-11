@@ -78,7 +78,9 @@ rule introductory_linkage_simulations:
 		Rmd = "Rmd/admix-fracts-of-hybrids.Rmd"
 	output:
 		html = "docs/001-introductory-linkage-sims.html",
-		fig = "results/figures/figure-001.pdf"
+		fig = "results/figures/linkage-sims-fig.pdf",
+		fig_eps = "results/figures/linkage-sims-fig.eps",
+		simdat = "results/admix-fracts-of-hybrids/simulated-data.rds"
 	log:
 		"results/logs/introductory_linkage_simulations/log.txt"
 	threads: 8
