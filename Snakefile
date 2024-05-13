@@ -90,6 +90,18 @@ rule introductory_linkage_simulations:
 		"R/render-rmd-for-snakemake.R"
 
 
+rule texify_link_sims_fig:
+	input:
+		eps = "results/figures/linkage-sims-fig.eps",
+		tex = "image-forge/admix-fract-fig-forge.tex"
+	output:
+		pdf = "image-forge/admix-fracts-texed.pdf"
+	shell:
+		" cp {input.eps} $(dirname {input.tex});    "
+		" cd image-forge; latex $(basename {input.tex}); "
+		" dvips -E -o adfr.ps admix-fract-fig-forge.dvi; ps2pdf adfr.ps; pdfcrop adfr.pdf; "
+		" mv adfr-crop.pdf $(basename {output.pdf}) "
+
 rule figure_of_permutation_methods:
 	input:
 		Rmd = "Rmd/permutation-methods-figure.Rmd"
