@@ -30,7 +30,9 @@ if(!exists("snakemake")) {
   )
   output_list <- list(
     barplots = "results/summarizing-newhybrids-simulations/newhybs-barplots.pdf",
-    barplots_eps = "image-forge/newhybs-barplots.eps"
+    barplots_eps = "image-forge/newhybs-barplots.eps",
+    texed_barplots = "results/summarizing-newhybrids-simulations/newhybs-texed-crop.pdf"  # this is the one that gets used in the paper!
+
   )
 } else {
   input_list = snakemake@input
@@ -212,14 +214,14 @@ for(TC in cat_ord) {
   plots[[TC]] <- the_plot
     
 }
-names(plots) <- TCs
 
 # Before we cowplot those together, I am going to have to roll my own legend.  I will
 # only include the ones that appear in there.
 legie <- tribble( 
   ~cat, ~x, ~y,
   "lCCT",  8, 28,
-  "lBxC2", 58, 28, 
+  "lBxC", 58, 28,
+  "lBxC2", 108, 28,
   "lF1", 8, 18,
   "lF2", 58, 18,
   "lBxCxBxC2", 8, 8
@@ -237,7 +239,7 @@ legend_bit <- ggplot(legie) +
   coord_fixed(ratio = 1) +
   guides(fill = guide_legend(position = "none")) +
   theme(legend.position = "none") +
-  xlim(-2, 90) +
+  xlim(-2, 140) +
   ylim(0, 42)
   
 
@@ -250,7 +252,14 @@ pg <- plot_grid(plotlist = plots, ncol = 1)
 ggsave(pg, filename = output_list$barplots, width = 4, height = 10)
 ggsave(pg, filename = output_list$barplots_eps, width = 4, height = 10)
 
-system(
-  "cd image-forge; latex newyhybs-fig-forge.tex; dvips -E -o newhybs-texed.ps newyhybs-fig-forge.dvi; ps2pdf newhybs-texed.ps; pdfcrop newhybs-texed.pdf"
+CALL <- paste(
+  "cd image-forge; latex newyhybs-fig-forge.tex; dvips -E -o newhybs-texed.ps newyhybs-fig-forge.dvi; ps2pdf newhybs-texed.ps; pdfcrop newhybs-texed.pdf && cp newhybs-texed-crop.pdf ../",
+  "results/summarizing-newhybrids-simulations/newhybs-texed-crop.pdf",
+  "  && cd ..  ",
+  collapse = "",
+  sep = ""
 )
+
+system(CALL)
+
 ```
