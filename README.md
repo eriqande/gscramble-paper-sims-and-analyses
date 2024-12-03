@@ -1,6 +1,8 @@
 gscramble-paper-sims-and-analyses
 ================
 
+[![DOI](https://zenodo.org/badge/504563380.svg)](https://doi.org/10.5281/zenodo.14270660)
+
 This repo holds the code and data for reproducing the simulations,
 analyses, and figures performed by Eric C. Anderson that accompany the
 paper, “GSCRAMBLE: Simulation of admixed individuals without reuse of
