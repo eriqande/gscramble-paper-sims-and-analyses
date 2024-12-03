@@ -48,7 +48,7 @@ To do the actual simulations on SEDNA I did this:
 snakemake --profile hpcc-profiles/slurm/sedna results/compiled/Q-values-from-sims.tsv.gz
 ```
 
-# Some notes on GSPs to use
+### Some notes on GSPs to use
 
 To get large numbers of simulated admixed individuals of different
 admixture fractions when using gscramble we note that:
@@ -63,7 +63,7 @@ And that only consumes 4 As and 2 Bs. So, that covers most of our needs,
 except for a BX1 x F1 or BX1 x F2, which will give us the Q = 0.375
 category.
 
-# While developing the sims
+### While developing the sims…
 
 I have a couple little test cases on the original sims to run on my
 laptop like this:
