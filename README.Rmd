@@ -7,11 +7,15 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This repo holds all the code for reproducing the simulations, analyses, and
-figures from the paper, "Title still not determined" by Authors, Authors,
-Authors, about the R package 'gscramble'.  
+This repo holds the code and data for reproducing the simulations, analyses, and
+figures performed by Eric C. Anderson that accompany the paper,
+"GSCRAMBLE: Simulation of admixed individuals without reuse of genetic material" by 
+Eric C. Anderson, Rachael M. Giglio, Matthew G. DeSaix and Timothy J. Smyser, to be published
+in Molecular Ecology Resources.  
 
-It is set up to be relatively reproducible.  Running it all the way we
+The R package described in the paper is [available on CRAN](https://CRAN.R-project.org/package=gscramble)
+
+This repository is set up to be easily reproducible.  Running all of it the way we
 did requires Snakemake.  
 
 The R packages for this are maintained by the 'renv' package.  So, run it with
@@ -24,7 +28,7 @@ R version 4.2.0 (2022-04-22), and do these steps:
 as appropriate to your system.
 
 
-## Notes:
+## Notes during development:
 
 To run this on Sedna, I did this:
 ```sh
